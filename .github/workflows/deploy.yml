@@ -1,57 +1,29 @@
-name: Collect and deploy property finder
+name: Check Swoffers source access
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
-  schedule:
-    - cron: '23 2,8,14,20 * * *'
 permissions:
   contents: read
-concurrency:
-  group: property-finder-pages
-  cancel-in-progress: false
 jobs:
-  collect:
+  source-check:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      contents: write
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Test existing app and collector
-        run: node --test collector.test.cjs app.test.cjs
-      - name: Collect current properties
-        run: node --use-system-ca collector.cjs
-      - name: Test collected feed
-        run: node --test collector.test.cjs app.test.cjs
-      - name: Preserve successful feed in repository
+      - name: Read public Swoffers source pages
         run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add properties.json
-          if ! git diff --cached --quiet; then
-            git commit -m "Refresh Cooper Brouard listings"
-            git push
-          fi
-      - name: Build static site
-        run: node build.cjs
-      - uses: actions/upload-pages-artifact@v4
+          mkdir source-check
+          node --use-system-ca <<'NODE'
+          const fs=require('node:fs/promises');
+          const {robotsAllows}=require('./collector.cjs');
+          const origin='https://swoffers.co.uk';
+          async function read(route){const r=await fetch(origin+route,{headers:{'User-Agent':'GuernseyPropertyFinder/1.0 (private property search; low-frequency collector)'},signal:AbortSignal.timeout(30000)});if(!r.ok)throw Error(r.status+' '+route);return r.text()}
+          (async()=>{const robots=await read('/robots.txt');console.log(robots);await fs.writeFile('source-check/robots.txt',robots);for(const [name,route] of [['index','/property-search?market=local-sales'],['detail','/property/2-tropicana-bungalows-ruette-de-la-tour-castel']]){if(!robotsAllows(robots,route))throw Error('Robots disallows '+route);await new Promise(r=>setTimeout(r,1000));const html=await read(route);await fs.writeFile('source-check/'+name+'.html',html);console.log(name,html.length)}})().catch(e=>{console.error(e);process.exitCode=1});
+          NODE
+      - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          path: _site
-  deploy:
-    needs: collect
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy HTTPS site
-        id: deployment
-        uses: actions/deploy-pages@v4
+          name: swoffers-source-check
+          path: source-check
