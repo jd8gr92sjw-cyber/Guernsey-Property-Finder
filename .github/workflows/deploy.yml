@@ -1,0 +1,57 @@
+name: Collect and deploy property finder
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '23 2,8,14,20 * * *'
+permissions:
+  contents: read
+concurrency:
+  group: property-finder-pages
+  cancel-in-progress: false
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Test existing app and collector
+        run: node --test collector.test.cjs app.test.cjs
+      - name: Collect current properties
+        run: node --use-system-ca collector.cjs
+      - name: Test collected feed
+        run: node --test collector.test.cjs app.test.cjs
+      - name: Preserve successful feed in repository
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add properties.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Refresh Cooper Brouard listings"
+            git push
+          fi
+      - name: Build static site
+        run: node build.cjs
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+  deploy:
+    needs: collect
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy HTTPS site
+        id: deployment
+        uses: actions/deploy-pages@v4
