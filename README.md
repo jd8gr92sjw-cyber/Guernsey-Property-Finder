@@ -1,66 +1,69 @@
-# Guernsey Property Finder — hosted deployment
+# Guernsey Property Finder
 
-Status: prepared and locally tested; not yet published. GitHub account sign-in
-is required before repository creation, Pages activation and live validation.
-The original working app in the sibling Guernsey-Property-Finder folder is unchanged.
+Live app: https://jd8gr92sjw-cyber.github.io/Guernsey-Property-Finder/
 
-## Planned deployment
-- Free public GitHub repository, HTTPS GitHub Pages site.
-- GitHub Actions collects Cooper Brouard every six hours at 02:23, 08:23, 14:23
-  and 20:23 UTC; GitHub may delay scheduled jobs.
+Deployed successfully on 30 September 2026 using free public GitHub Pages
+hosting and GitHub Actions. The app and collector run independently of the
+original computer. The original working local app is preserved separately.
+
+## Collection and hosting
+- Cooper Brouard residential sales, including Local and Open Market properties.
+- Scheduled collection at 02:23, 08:23, 14:23 and 20:23 UTC every day.
+  GitHub may delay scheduled jobs; the app shows the actual collection time.
 - Pushes to main and manual workflow runs also collect, test and deploy.
-- A failed collection stops publication, keeping the existing live site intact.
-- Each successful feed is committed before deployment so subsequent runs start
-  from the latest good snapshot. No custom secrets or personal access tokens are
-  embedded in this repository.
-- A public repository contains the source code and public property data, not
-  browser-local notes, saved searches or shortlist data.
+- Failed collection stops publication, preserving the last successful live site.
+- Each successful feed is committed before deployment. No custom secrets or
+  personal access tokens are embedded in this repository.
+- The public repository contains app source and public property information.
+  Shortlists, saved searches and notes stay in the user's browser.
 
-## Necessary hosting adaptation
-The hosted Refresh listings button fetches the latest cloud-published feed.
-It does not call a local Node API or expose an unauthenticated collector endpoint.
-To force an immediate cloud collection, use Actions > Collect and deploy property
-finder > Run workflow. Normal collection runs automatically every six hours.
-The hosted offline cache has a separate version. Other application functions
-are unchanged. Relative paths support a repository subdirectory.
+The hosted Refresh listings button loads the latest published feed. For an
+immediate cloud collection, open Actions > Collect and deploy property finder >
+Run workflow. Check Actions if the collection timestamp becomes stale. GitHub
+can disable schedules after 60 days of repository inactivity.
 
-## Validation completed locally
-- All 12 collector/application tests pass.
-- Static build includes only the eight public app/data assets and .nojekyll.
-- Browser preview under /guernsey-property-finder/ loads 114 listings and photos.
-- Clear and hosted Refresh work, with no recorded browser warnings/errors.
-- Workflow configuration has not yet executed on GitHub; live HTTPS and scheduled
-  collector operation still require post-deployment verification.
+## Validation
+The first cloud workflow successfully collected 114 properties, passed the 12
+application/collector tests, preserved the feed and deployed the HTTPS site:
+https://github.com/jd8gr92sjw-cyber/Guernsey-Property-Finder/actions/runs/36685983598
 
-## Remaining deployment steps
-1. Sign in to the user's GitHub account.
-2. Create the public guernsey-property-finder repository and upload these source
-   files, including .github/workflows/deploy.yml, on main.
-3. Set Settings > Pages > Source to GitHub Actions.
-4. Run Collect and deploy property finder; verify collection, tests and deployment.
-5. Open the actual HTTPS URL returned by the successful deployment and test
-   search, saved search, shortlist, notes, photos, refresh and offline reload.
-6. Confirm the schedule is present on main and enabled in Actions. An initial
-   manual run validates the collector but does not prove a future scheduled run.
+Live browser checks passed: search by type/parish, saved-search recall after
+reload, shortlist persistence, property details, descriptions, photographs,
+notes after reload, removal of test data, feed refresh and narrow-screen layout
+at 375 and 320 pixel viewport settings. No browser warnings/errors were recorded.
+The live service worker reports offline readiness. Offline reload and note
+storage were previously tested locally; an offline reload of the public site
+and installation on a physical iPhone have not been performed here. The future
+scheduled trigger is configured; the initial successful run was triggered by a push.
 
-GitHub can disable schedules after 60 days of repository inactivity; successful
-feed commits normally provide ongoing activity. Check Actions if the on-screen
-collection timestamp becomes stale or GitHub sends a workflow failure notice.
+GitHub reported action-runtime deprecation warnings while successfully running
+the deployment actions on Node 24. These did not prevent collection or deployment.
 
-## iPhone installation — after successful deployment
-1. Open the confirmed HTTPS site address in Safari on the iPhone.
-2. Wait for properties to appear and the offline-ready message.
-3. Tap Share (use the More menu first if Share is not directly visible).
+## Install on iPhone
+1. Open the live app link above in Safari on your iPhone.
+2. Wait for the listings and the offline-ready message.
+3. Tap Share (use More first if Share is not directly visible).
 4. Tap Add to Home Screen.
-5. If shown, enable Open as Web App, then tap Add.
-6. Launch Guernsey Property Finder from its new Home Screen icon.
+5. If shown, turn on Open as Web App, then tap Add.
+6. Open Guernsey Property Finder using its Home Screen icon.
 
-The HTTPS URL is intentionally not guessed before deployment. Saved searches,
-shortlists and notes are local to each device/site origin; existing localhost
-records do not automatically transfer to the hosted address or iPhone. Photos
-need a connection or an existing browser cache. Do not clear website data if you
-want to retain local notes.
+Shortlists, saved searches and notes are local to each browser/device. Existing
+localhost records do not automatically transfer to the HTTPS site or iPhone.
+Photographs need a connection or an existing browser cache. Avoid clearing
+website data if you want to keep your notes.
 
-Official references:
-https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages
-https://support.apple.com/guide/iphone/iph42ab2f3a7/ios
+## Development
+Node.js 24; no npm packages required.
+
+    node --test collector.test.cjs app.test.cjs
+    node --use-system-ca collector.cjs
+    node build.cjs
+
+The build publishes only seven public app/data files plus .nojekyll in _site.
+The hosted app uses relative paths, a separate service-worker cache version,
+and the published feed instead of a local collection API. Existing search,
+shortlist, saved-search, property-detail and note functionality is preserved.
+
+References:
+- https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages
+- https://support.apple.com/guide/iphone/iph42ab2f3a7/ios
