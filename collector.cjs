@@ -23,6 +23,34 @@ function text(value = '') {
     return {amp:'&',quot:'"',apos:"'",lt:'<',gt:'>',nbsp:' ',pound:'£',rsquo:"'",lsquo:"'",ndash:'–',mdash:'—'}[e.toLowerCase()];
   }).replace(/\s+/g,' ').trim();
 }
+function advertisedPlot(...sources){
+  const words={half:.5,quarter:.25,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10};
+  const evidence=[];
+  const pattern=/\b(?:(just\s+under|just\s+over|approximately|approx\.?|around|about|circa|close to|nearly|almost|in excess of|more than|less than|at least|at most|over|under|up to)\s+)?(?:a\s+)?((?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+and\s+a\s+(?:half|quarter)|\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?|half|quarter|one|two|three|four|five|six|seven|eight|nine|ten)(?:\s+of)?(?:\s+an?)?[\s-]+acres?\b/gi;
+  for(const source of sources){
+    const description=text(source);
+    for(const m of description.matchAll(pattern)){
+      const before=description.slice(Math.max(0,m.index-100),m.index),after=description.slice(m.index+m[0].length,m.index+m[0].length+70);
+      const context=before+m[0]+after;
+      if(!/\b(?:plot|site|gardens?|grounds?|land|field|set|sitting|situated)\b/i.test(context))continue;
+      if(/\b(?:nearby|neighbour(?:ing)?|overlooking|views? (?:over|across)|option to purchase|available separately)\b/i.test(context))continue;
+      const mixed=m[2].toLowerCase().split(/\s+and\s+a\s+/);
+      const amount=mixed.length===2?(words[mixed[0]]??Number(mixed[0]))+words[mixed[1]]:words[m[2].toLowerCase()]??Number(m[2].replaceAll(',',''));
+      if(!Number.isFinite(amount)||amount<=0)continue;
+      const modifier=(m[1]||'').toLowerCase();
+      const qualifier=/under|less than|up to|at most|nearly|almost/.test(modifier)?'upper':/over|more than|in excess|at least/.test(modifier)?'lower':modifier?'approximate':'exact';
+      const range=/(?:\d|half|quarter|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:[-–—/]|to|and)\s*$/i.test(before)||/\bbetween\s+[^.!?]{0,30}$/i.test(before)||/[.,−-]\s*$/.test(before);
+      const partial=/\b(?:additional|further|separate)\s+(?:[\w.]+\s+){0,6}(?:land|field|parcel|acres?)\b/i.test(context)||/\bagricultural\s+(?:field|land)\b/i.test(context);
+      const quote=context.trim();
+      if(!evidence.some(e=>e.value===amount&&e.qualifier===qualifier&&e.modifier===modifier&&e.partial===partial&&e.range===range))evidence.push({value:amount,qualifier,modifier,partial,range,wording:quote});
+    }
+  }
+  if(!evidence.length)return {plot:null};
+  // Never add separate parcels or turn a range/contradiction into an invented total.
+  const distinct=new Set(evidence.map(e=>e.value+':'+e.qualifier));
+  if(distinct.size!==1||evidence.some(e=>e.partial||e.range))return {plot:null,plotQualifier:'unconfirmed',plotEvidence:evidence};
+  return {plot:evidence[0].value,plotQualifier:evidence[0].qualifier,plotModifier:evidence[0].modifier,plotEvidence:evidence};
+}
 async function request(url) {
   if(![ORIGIN,SWOFFERS].includes(new URL(url).origin))throw Error('Unexpected collection origin');
   for(let attempt=0;attempt<3;attempt++){
@@ -85,7 +113,8 @@ function parseProperty(html, card, now) {
   const description=text(html.match(/<meta property="og:description" content="([^"]*)"/)?.[1]);
   // Some current source listings omit their description; retain them explicitly empty.
   const photos=[...new Set([].concat(residence.image||[]).filter(u=>typeof u==='string'&&/^https:\/\/(cdn\.)?cooperbrouard\.com\//.test(u)))];
-  return {id:Number(card.url.match(/property\/(\d+)/)[1]),source:'cooper-brouard',name:text(residence.name),agent:'Cooper Brouard',market:card.market,price,priceLabel:price===null?'Price on application':priceLabel,beds:Number.isFinite(Number(residence.numberOfBedrooms))&&residence.numberOfBedrooms!=null?Number(residence.numberOfBedrooms):null,type,sourceType:rawType,sourceTypes,parish,location,address:text(residence.address?.streetAddress),description,url:card.url,photos,status,date:listing.datePosted||listing.datePublished||null,lastSeen:now,plot:null,area:null,parking:null,south:null,garden:null,refurb:null,development:null};
+  const features=html.match(/<div class="cb-single-property-key-features">([\s\S]*?)<\/ul>/)?.[1]||'';
+  return {id:Number(card.url.match(/property\/(\d+)/)[1]),source:'cooper-brouard',name:text(residence.name),agent:'Cooper Brouard',market:card.market,price,priceLabel:price===null?'Price on application':priceLabel,beds:Number.isFinite(Number(residence.numberOfBedrooms))&&residence.numberOfBedrooms!=null?Number(residence.numberOfBedrooms):null,type,sourceType:rawType,sourceTypes,parish,location,address:text(residence.address?.streetAddress),description,url:card.url,photos,status,date:listing.datePosted||listing.datePublished||null,lastSeen:now,...advertisedPlot(description,features),area:null,parking:null,south:null,garden:null,refurb:null,development:null};
 }
 let running=null;
 function collect(){if(running)return running;running=run().finally(()=>running=null);return running}
@@ -158,7 +187,8 @@ function parseSwoffersProperty(html,card,now){
   const page=graphs.find(g=>g['@type']==='WebPage');
   const address=text(swoffersField(html,'property-main__locale-area'));
   // Negative IDs reserve a separate namespace without changing existing CB IDs or notes.
-  return {id:-sourceId,source:'swoffers',name,agent:'Swoffers',market:card.market,price,priceLabel,beds,type:card.type||null,sourceType:card.sourceType||null,parish,location,address,description,url:card.url,photos,status,date:page?.datePublished||null,lastSeen:now,plot:null,area:null,parking:null,south:null,garden:null,refurb:null,development:null};
+  const features=text(html.match(/<meta property="og:description" content="([^"]*)"/)?.[1]);
+  return {id:-sourceId,source:'swoffers',name,agent:'Swoffers',market:card.market,price,priceLabel,beds,type:card.type||null,sourceType:card.sourceType||null,parish,location,address,description,url:card.url,photos,status,date:page?.datePublished||null,lastSeen:now,...advertisedPlot(description,features),area:null,parking:null,south:null,garden:null,refurb:null,development:null};
 }
 async function collectSwoffers(started){
   const robots=await request(SWOFFERS+'/robots.txt');
@@ -200,7 +230,7 @@ async function run(){
   await fs.writeFile(DATA+'.tmp',JSON.stringify(data,null,2)+'\n');await fs.rename(DATA+'.tmp',DATA);
   console.log(`Published ${properties.length} current residential listings`);return data;
 }
-module.exports={collect,parseIndex,parseProperty,robotsAllows,text,askingPrice,parseSwoffersIndex,parseSwoffersProperty,collectSwoffers,collectCooperBrouard};
+module.exports={collect,parseIndex,parseProperty,robotsAllows,text,askingPrice,advertisedPlot,parseSwoffersIndex,parseSwoffersProperty,collectSwoffers,collectCooperBrouard};
 if(require.main===module)collect().catch(error=>{console.error(error.message);process.exitCode=1});
 
 

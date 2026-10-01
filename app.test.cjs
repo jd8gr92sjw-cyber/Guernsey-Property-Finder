@@ -113,3 +113,16 @@ test('50 acres and 50000 sq ft exclude unknown and undersized listings in either
  assert.equal(t.e.plot.value,'50');assert.equal(t.e.area.value,'50000');
  assert.equal(matches({...p,plot:null,area:null}),false);
 });
+
+test('plot bounds and approximation remain visible and cannot create false minimum matches',async()=>{
+ const t=await boot();t.run('resetSearch()');t.e.plot.value='.5';
+ const base={...t.getFeed().properties[0],plot:.5,plotEvidence:[{wording:'A plot of around half an acre.'}]};
+ for(const qualifier of ['exact','approximate','lower'])assert.equal(t.run(`matches(${JSON.stringify({...base,plotQualifier:qualifier})})`),true);
+ assert.equal(t.run(`matches(${JSON.stringify({...base,plotQualifier:'upper'})})`),false);
+ assert.equal(t.run(`matches(${JSON.stringify({...base,plot:null,plotQualifier:'unconfirmed'})})`),false);
+ t.e.plot.value='.6';assert.equal(t.run(`matches(${JSON.stringify({...base,plotQualifier:'lower'})})`),false);
+ assert.match(t.run(`card(${JSON.stringify({...base,plotQualifier:'approximate'})})`),/Approx\. 0\.5 acres/);
+ assert.match(t.run(`card(${JSON.stringify({...base,plotQualifier:'upper'})})`),/Under 0\.5 acres/);
+ assert.match(t.run(`card(${JSON.stringify({...base,plot:null})})`),/Plot total unconfirmed/);
+ assert.ok(!t.run(`plotEvidenceHtml(${JSON.stringify({...base,plotEvidence:[{wording:'<script>bad()</script>'}]})})`).includes('<script>'));
+});

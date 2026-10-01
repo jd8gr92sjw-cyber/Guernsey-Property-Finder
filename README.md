@@ -65,6 +65,20 @@ Photographs need a connection or an existing browser cache. Avoid clearing
 website data if you want to keep your notes.
 
 ## Development
+### Advertised plot sizes
+
+The collector reads explicit acreage from each listing's description and key
+features. Exact, approximate and lower/upper-bound measurements retain their
+qualifications and source wording in the property details. It does not estimate
+land from photographs, sum separate parcels, infer total floor area from room
+dimensions, or convert unsupported land units.
+
+Conflicting amounts/qualifications, ranges and partial land measurements remain
+unconfirmed and cannot meet a plot minimum. An upper bound such as "under half
+an acre" cannot establish a minimum. Approximate sizes are compared at their
+advertised value and visibly labelled; check the original agent listing before
+relying on a threshold. Floor-area collection remains a separate future step.
+
 Node.js 24; no npm packages required.
 
     node --test collector.test.cjs app.test.cjs
