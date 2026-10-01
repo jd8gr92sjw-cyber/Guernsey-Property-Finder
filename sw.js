@@ -1,5 +1,5 @@
 const CACHE_PREFIX='guernsey-property-finder-';
-const CACHE=CACHE_PREFIX+'hosted-v16';
+const CACHE=CACHE_PREFIX+'hosted-v17';
 const CORE=['./','./index.html','./app.js','./manifest.json','./icon-192.png','./icon-512.png'];
 const absolute=p=>new URL(p,self.registration.scope).href;
 const CORE_URLS=new Set(CORE.map(absolute));

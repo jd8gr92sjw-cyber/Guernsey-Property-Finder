@@ -3,6 +3,19 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs/promises');
 const path=require('node:path');
 const {parseProperty,parseIndex,robotsAllows,collect,askingPrice,parseSwoffersIndex,parseSwoffersProperty,collectSwoffers}=require('./collector.cjs');
+const {parseCherryProperty,parseCherryFeed}=require('./collector.cjs');
+const cherry={_id:'ea-s335',slug:{current:'ea-s335'},listingType:'buy',department:'Local Market Sales',market:{title:'Local Market'},status:{title:'On Market'},propertyType:{title:'Local Market House'},publicPrice:'£545,000',price:545000,bedrooms:3,title:'Mirabelle, St Peter Port',parish:{title:'St Peter Port'},publishedAt:'2023-05-15T09:14:00.000Z',description:'A house set in a plot of half an acre. Total floor area 1200 sq ft.',featuredImage:{asset:{url:'http://med05.expertagent.co.uk/photo.jpg'}},highlights:['Garden']};
+test('Cherry Godfrey maps public sales, statuses, market, sizes and secure photos',()=>{
+ const p=parseCherryProperty(cherry,'now');assert.equal(p.id,-1000000670);assert.equal(p.price,545000);assert.equal(p.plot,.5);assert.equal(p.area,1200);assert.equal(p.garden,null);assert.equal(p.url,'https://www.cherrygodfreyproperty.com/buy/property/ea-s335');assert.deepEqual(p.photos,['https://med05.expertagent.co.uk/photo.jpg']);
+ assert.equal(parseCherryProperty({...cherry,status:{title:'Under offer with Cherry Godfrey Property'},parish:null},'now').status,'under');assert.equal(parseCherryProperty({...cherry,parish:null},'now').parish,null);
+ const open=parseCherryProperty({...cherry,market:{title:'Open Market'},department:'Open Market Sales',status:{title:'Open Market'},parish:{title:'St Martin'}},'now');assert.equal(open.market,'Open Market');assert.equal(open.parish,"St Martin's");
+ for(const changed of [{status:{title:'Sold by Cherry Godfrey Property'}},{propertyType:{title:'Agricultural Field'}},{isPrivateListing:true},{listingType:'rent'},{publicPrice:'POA'}])assert.equal(parseCherryProperty({...cherry,...changed},'now'),null);
+});
+test('Cherry Godfrey rejects incomplete or duplicate feeds before publication',()=>{
+ const feed={success:true,schemaMatches:true,isSyncing:false,count:1,properties:[cherry]};assert.equal(parseCherryFeed(feed,'now').coverage.collected,1);
+ for(const changed of [{success:false},{schemaMatches:false},{isSyncing:true},{count:2},{count:2,properties:[cherry,cherry]}])assert.throws(()=>parseCherryFeed({...feed,...changed},'now'),/Incomplete/);
+ assert.throws(()=>parseCherryProperty({...cherry,price:1},'now'),/disagree/);
+});
 const card={url:'https://www.cooperbrouard.com/property/123/',market:'Local Market',location:'St Martin\'s GY4 6LR'};
 function html({status='for-sale',department='residential-sales',description='A &amp; B',price=895000,bedrooms=3,label='£895,000',type='bungalow'}={}){return `<body class="availability-${status} department-${department} on-market-yes property_type-${type}"><meta property="og:description" content="${description}"><div class="cb-single-property-header__top"><h2>${label}</h2></div><script type="application/ld+json">${JSON.stringify({'@graph':[{'@type':['Residence','SingleFamilyResidence'],name:'A &amp; B',numberOfBedrooms:bedrooms,image:['https://cdn.cooperbrouard.com/media/photo.jpg','javascript:bad'],address:{streetAddress:'Road'}},{offers:{price,businessFunction:'https://purl.org/goodrelations/v1#Sell'},datePosted:'2026-09-01'}]})}</script>`}
 test('extracts explicit facts and safe photo URLs without inventing garden facts',()=>{const p=parseProperty(html(),card,'now');assert.equal(p.price,895000);assert.equal(p.beds,3);assert.equal(p.type,'Bungalow');assert.equal(p.description,'A & B');assert.equal(p.parking,null);assert.equal(p.garden,null);assert.equal(p.photos.length,1)});

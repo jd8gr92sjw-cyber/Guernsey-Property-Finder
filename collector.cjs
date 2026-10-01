@@ -3,6 +3,7 @@ const path = require('node:path');
 const {setTimeout: delay} = require('node:timers/promises');
 const ORIGIN = 'https://www.cooperbrouard.com';
 const SWOFFERS = 'https://swoffers.co.uk';
+const CHERRY = 'https://www.cherrygodfreyproperty.com';
 const DATA = path.join(__dirname, 'properties.json');
 const UA = 'GuernseyPropertyFinder/1.0 (private property search; low-frequency collector)';
 // Only explicitly advertised positive GBP asking prices qualify. A hidden
@@ -84,7 +85,7 @@ function advertisedFloor(...sources){
  return {area:chosen.value,areaQualifier:chosen.qualifier,areaModifier:chosen.modifier,areaConflict:evidence.some(e=>Math.abs(e.value-smallest)>Math.max(1,smallest*.01)),areaEvidence:evidence};
 }
 async function request(url) {
-  if(![ORIGIN,SWOFFERS].includes(new URL(url).origin))throw Error('Unexpected collection origin');
+  if(![ORIGIN,SWOFFERS,CHERRY].includes(new URL(url).origin))throw Error('Unexpected collection origin');
   for(let attempt=0;attempt<3;attempt++){
     try{
       const r=await fetch(url,{headers:{'User-Agent':UA},signal:AbortSignal.timeout(30000)});
@@ -252,17 +253,60 @@ async function collectSwoffers(started){
   if(!properties.length)throw Error('No priced Swoffers residential properties; previous feed retained');
   return {properties,coverage:{markets:['Local Market','Open Market'],discovered:cards.length,collected:properties.length,excluded}};
 }
+function parseCherryProperty(p,now){
+  if(p.isPrivateListing||p.listingType!=='buy'||!['Local Market Sales','Open Market Sales'].includes(p.department))return null;
+  const rawStatus=text(p.status?.title);
+  if(/sold|withdrawn|let/i.test(rawStatus))return null;
+  const status=/^under offer\b/i.test(rawStatus)||p.priority==='Under Offer'?'under':['On Market','NEW','Open Market'].includes(rawStatus)?'available':null;
+  if(!status)throw Error('Unknown Cherry Godfrey status: '+rawStatus);
+  const sourceType=text(p.propertyType?.title);
+  if(/field|land|plot|commercial|garage|parking/i.test(sourceType))return null;
+  const type=/bungalow/i.test(sourceType)?'Bungalow':/flat|apartment/i.test(sourceType)?'Apartment':/house|cottage/i.test(sourceType)?'House':null;
+  if(!type)return null;
+  const priceLabel=text(p.publicPrice),price=askingPrice(priceLabel,p.price);
+  if(price===null)return null;
+  const identity=String(p._id).match(/^ea-s(\d+)(-om)?$/);
+  if(!identity||!Number.isSafeInteger(Number(identity[1]))||Number(identity[1])>100000000)throw Error('Unexpected Cherry Godfrey identity');
+  const id=-1000000000-Number(identity[1])*2-(identity[2]?1:0);
+  // Use the agent's public card route instead of legacy HTTP source links.
+  if(p.slug?.current!==p._id)throw Error('Unexpected Cherry Godfrey listing slug');
+  const url=new URL('/buy/property/'+p.slug.current,CHERRY);
+  const market=text(p.market?.title);
+  if(!['Local Market','Open Market'].includes(market))throw Error('Unknown Cherry Godfrey market');
+  const parishNames={'St Martin':"St Martin's",'St Sampson':"St Sampson's",'St Andrew':"St Andrew's",'St Peter':"St Peter's",'St Saviour':"St Saviour's"};
+  const suppliedParish=text(p.parish?.title||p.location?.title),parish=parishNames[suppliedParish]||suppliedParish||null;
+  if(parish&&!['Castel','Forest','Vale','Torteval',"St Andrew's","St Martin's",'St Peter Port',"St Peter's","St Sampson's","St Saviour's"].includes(parish))throw Error('Unknown Cherry Godfrey parish: '+parish);
+  const name=text(p.title);if(!name)throw Error('Missing Cherry Godfrey property name');
+  const description=text(p.description||p.descriptionHtml),features=(p.highlights||[]).map(text).join('. ');
+  const photos=[...new Set([p.featuredImage,...(p.galleries||[]).flatMap(g=>g.images||[])].flatMap(i=>{
+    try{const u=new URL(i?.asset?.url);if(!/^med\d+\.expertagent\.co\.uk$/.test(u.hostname)||!['http:','https:'].includes(u.protocol))return [];u.protocol='https:';return [u.href]}catch{return []}
+  }))];
+  return {id,source:'cherry-godfrey',agent:'Cherry Godfrey',name,market,price,priceLabel,beds:Number.isInteger(p.bedrooms)&&p.bedrooms>=0?p.bedrooms:null,type,sourceType,parish,location:suppliedParish,address:name,description,url:url.href,photos,status,date:p.publishedAt||null,lastSeen:now,...advertisedPlot(description,features),...advertisedFloor(description,features),parking:null,south:null,garden:null,refurb:null,development:null};
+}
+function parseCherryFeed(feed,started){
+  if(feed.success!==true||feed.schemaMatches!==true||feed.isSyncing||!Array.isArray(feed.properties)||!Number.isInteger(feed.count)||feed.count!==feed.properties.length||feed.count===0||new Set(feed.properties.map(p=>p._id)).size!==feed.count)throw Error('Incomplete Cherry Godfrey feed; previous data retained');
+  const properties=feed.properties.map(p=>parseCherryProperty(p,started)).filter(Boolean);
+  if(!properties.length)throw Error('No priced Cherry Godfrey residential properties; previous feed retained');
+  return {properties,coverage:{markets:['Local Market','Open Market'],discovered:feed.count,collected:properties.length,excluded:feed.count-properties.length}};
+}
+async function collectCherry(started){
+  const robots=await request(CHERRY+'/robots.txt'),url=CHERRY+'/api/properties/expert-agent?listingType=buy&includeStatus=true';
+  if(!robotsAllows(robots,new URL(url).pathname))throw Error('Cherry Godfrey collection disallowed by robots.txt');
+  await delay(500);
+  return parseCherryFeed(JSON.parse(await request(url)),started);
+}
 async function run(){
   const started=new Date().toISOString();
   const cb=await collectCooperBrouard(started);
   const sw=await collectSwoffers(started);
-  const properties=[...cb.properties,...sw.properties];
+  const cg=await collectCherry(started);
+  const properties=[...cb.properties,...sw.properties,...cg.properties];
   if(properties.some(p=>!Number.isFinite(p.price)||p.price<=0)||new Set(properties.map(p=>p.id)).size!==properties.length)throw Error('Invalid combined feed; previous data retained');
-  const data={schemaVersion:1,agent:'Cooper Brouard and Swoffers',agents:['Cooper Brouard','Swoffers'],sourceUrl:ORIGIN,sourceUrls:[ORIGIN,SWOFFERS],generatedAt:new Date().toISOString(),startedAt:started,coverage:{markets:['Local Market','Open Market'],discovered:cb.coverage.discovered+sw.coverage.discovered,collected:properties.length,excluded:cb.coverage.excluded+sw.coverage.excluded,sources:{'cooper-brouard':cb.coverage,swoffers:sw.coverage}},properties};
+  const data={schemaVersion:1,agent:'Cooper Brouard, Swoffers and Cherry Godfrey',agents:['Cooper Brouard','Swoffers','Cherry Godfrey'],sourceUrl:ORIGIN,sourceUrls:[ORIGIN,SWOFFERS,CHERRY],generatedAt:new Date().toISOString(),startedAt:started,coverage:{markets:['Local Market','Open Market'],discovered:cb.coverage.discovered+sw.coverage.discovered+cg.coverage.discovered,collected:properties.length,excluded:cb.coverage.excluded+sw.coverage.excluded+cg.coverage.excluded,sources:{'cooper-brouard':cb.coverage,swoffers:sw.coverage,'cherry-godfrey':cg.coverage}},properties};
   await fs.writeFile(DATA+'.tmp',JSON.stringify(data,null,2)+'\n');await fs.rename(DATA+'.tmp',DATA);
   console.log(`Published ${properties.length} current residential listings`);return data;
 }
-module.exports={collect,parseIndex,parseProperty,robotsAllows,text,askingPrice,advertisedPlot,advertisedFloor,parseSwoffersIndex,parseSwoffersProperty,collectSwoffers,collectCooperBrouard};
+module.exports={collect,parseIndex,parseProperty,robotsAllows,text,askingPrice,advertisedPlot,advertisedFloor,parseSwoffersIndex,parseSwoffersProperty,collectSwoffers,collectCooperBrouard,parseCherryProperty,parseCherryFeed,collectCherry};
 if(require.main===module)collect().catch(error=>{console.error(error.message);process.exitCode=1});
 
 

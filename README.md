@@ -7,11 +7,11 @@ hosting and GitHub Actions. The app and collector run independently of the
 original computer. The original working local app is preserved separately.
 
 ## Collection and hosting
-- Cooper Brouard and Swoffers residential sales, including Local and Open Market properties.
+- Cooper Brouard, Swoffers and Cherry Godfrey residential sales, including Local and Open Market properties.
 - Only positive numerical asking prices are collected. POA, Price on Application,
-  Price on Request and missing-price listings are excluded from both agents.
+  Price on Request and missing-price listings are excluded from all agents.
 - Swoffers pagination totals and source type filters are checked before publication.
-  Both agents must finish successfully before the combined feed replaces the previous one.
+  All three agents must finish successfully before the combined feed replaces the previous one.
 - Scheduled collection at 02:23, 08:23, 14:23 and 20:23 UTC every day.
   GitHub may delay scheduled jobs; the app shows the actual collection time.
 - Pushes to main and manual workflow runs also collect, test and deploy.
@@ -33,6 +33,17 @@ Brouard IDs remain unchanged; Swoffers uses negative source IDs to avoid conflic
 with existing notes and shortlists. Search, details and photographs support both
 agents without changing the layout. Previously saved property snapshots and notes
 are retained, even when a listing is removed from the current feed.
+
+## Cherry Godfrey integration
+
+The public website's buy feed is collected once per refresh. Its declared count,
+unique source identities and completeness flags are checked before publication.
+Sold listings, agricultural fields, private listings and unpriced listings are
+excluded. Available and under-offer residential sales retain explicit market,
+bedroom, price and advertised size data. Missing parish and sizes remain unknown.
+Cherry Godfrey IDs use a reserved negative range; existing IDs are unchanged.
+Original links use the website's public detail routes, and Expert Agent photos
+use HTTPS. The existing layout and collection schedule are unchanged.
 
 ## Original deployment validation
 The first cloud workflow successfully collected 114 properties, passed the 12

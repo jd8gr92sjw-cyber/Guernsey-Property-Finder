@@ -1,5 +1,13 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const vm=require('node:vm');const path=require('node:path');
 const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),script=fs.readFileSync(path.join(__dirname,'app.js'),'utf8');
+test('Cherry Godfrey records load, filter and open details with secure photos and original links',async()=>{
+ const t=await boot(),base=t.getFeed().properties[0];
+ const p={...base,id:-1000000670,source:'cherry-godfrey',agent:'Cherry Godfrey',name:'Cherry fixture',market:'Local Market',price:545000,url:'https://www.cherrygodfreyproperty.com/buy/property/ea-s335',photos:['https://med05.expertagent.co.uk/photo.jpg']};
+ t.setFeed({...t.getFeed(),properties:[p]});await t.context.loadListings();assert.equal(t.e.count.textContent,'1 matching property');assert.match(t.e.results.innerHTML,/Cherry Godfrey/);
+ t.e.market.value='Open Market';t.run('runSearch()');assert.equal(t.e.count.textContent,'0 matching properties');t.e.market.value='Local Market';t.run('runSearch()');assert.equal(t.e.count.textContent,'1 matching property');
+ t.run(`showDetail(${p.id})`);assert.match(t.e.detail.innerHTML,/https:\/\/med05\.expertagent\.co\.uk\/photo\.jpg/);assert.match(t.e.detail.innerHTML,/https:\/\/www\.cherrygodfreyproperty\.com\/buy\/property\/ea-s335/);
+ assert.equal(t.run("safeUrl('https://med05.expertagent.co.uk.evil.test/photo.jpg')"),'');assert.equal(t.run("safeUrl('http://med05.expertagent.co.uk/photo.jpg')"),'');
+});
 test('Back to results restores the position captured before opening details',async()=>{
  const t=await boot(),id=t.getFeed().properties[0].id,positions=[];
  t.context.window.scrollTo=(x,y)=>positions.push([x,y]);t.context.window.scrollY=2400;t.run(`showDetail(${id})`);
