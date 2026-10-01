@@ -17,11 +17,13 @@ function matches(p){
  if(p.unavailable)return false;
  const min=Number(val('minPrice'))||0,max=val('maxPrice')===''?Infinity:Number(val('maxPrice'));
  if(p.price==null){if((min||max!==Infinity)&&!checked('unknown'))return false}else if(p.price<min||p.price>max)return false;
- for(const k of ['beds','plot','area'])if(Number(val(k))>0&&(p[k]==null?!checked('unknown'):p[k]<Number(val(k))))return false;
+ if(Number(val('beds'))>0&&(p.beds==null?!checked('unknown'):p.beds<Number(val('beds'))))return false;
+ // Missing feature information is a possible match; only known failures exclude it.
+ for(const k of ['plot','area'])if(Number(val(k))>0&&p[k]!=null&&p[k]<Number(val(k)))return false;
  if(val('type')&&(p.type==null?!checked('unknown'):p.type!==val('type')))return false;
  if(val('parish')&&p.parish!==val('parish'))return false;
- if(checked('parking')&&(p.parking==null?!checked('unknown'):p.parking<3))return false;
- for(const k of ['south','garden','refurb','development'])if(checked(k)&&(p[k]==null?!checked('unknown'):!p[k]))return false;
+ if(checked('parking')&&p.parking!=null&&p.parking<3)return false;
+ for(const k of ['south','garden','refurb','development'])if(checked(k)&&p[k]===false)return false;
  if(val('status')==='new'&&!isNew(p))return false;
  if(val('status')&&val('status')!=='new'&&p.status!==val('status'))return false;
  return true;
