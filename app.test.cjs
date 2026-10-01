@@ -1,5 +1,12 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const vm=require('node:vm');const path=require('node:path');
 const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),script=fs.readFileSync(path.join(__dirname,'app.js'),'utf8');
+test('Back to results restores the position captured before opening details',async()=>{
+ const t=await boot(),id=t.getFeed().properties[0].id,positions=[];
+ t.context.window.scrollTo=(x,y)=>positions.push([x,y]);t.context.window.scrollY=2400;t.run(`showDetail(${id})`);
+ t.context.window.scrollY=0;t.run('hideDetail()');assert.deepEqual(positions,[[0,2400]]);
+ t.run(`toggleShort(${id});currentTab='shortlist';runSearch()`);t.context.window.scrollY=600;t.run(`showDetail(${id})`);t.run('hideDetail()');assert.deepEqual(positions.at(-1),[0,600]);
+ assert.equal(t.e.listPanel.style.display,'block');assert.equal(t.e.detail.className,'detail');
+});
 test('app starts unrestricted with saved searches retained for explicit loading',async()=>{
  const saved={minPrice:'800000',beds:'3',market:'Local Market',parking:true,unknown:true};
  const t=await boot({gp_saved:JSON.stringify(saved)});
