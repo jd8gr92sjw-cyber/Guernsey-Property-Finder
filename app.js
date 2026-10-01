@@ -27,8 +27,8 @@ function matches(p){
  const min=Number(val('minPrice'))||0,max=val('maxPrice')===''?Infinity:Number(val('maxPrice'));
  if(p.price==null){if((min||max!==Infinity)&&!checked('unknown'))return false}else if(p.price<min||p.price>max)return false;
  if(Number(val('beds'))>0&&(p.beds==null?!checked('unknown'):p.beds<Number(val('beds'))))return false;
- // Missing feature information is a possible match; only known failures exclude it.
- for(const k of ['plot','area'])if(Number(val(k))>0&&p[k]!=null&&p[k]<Number(val(k)))return false;
+ // Entered size minimums require a confirmed measurement; missing sizes cannot pass.
+ for(const k of ['plot','area'])if(Number(val(k))>0&&(p[k]==null||p[k]<Number(val(k))))return false;
  if(val('type')&&(p.type==null?!checked('unknown'):p.type!==val('type')))return false;
  if(val('parish')&&p.parish!==val('parish'))return false;
  if(checked('parking')&&p.parking!=null&&p.parking<3)return false;
@@ -48,7 +48,7 @@ function runSearch(){
  const r=currentTab==='shortlist'?allProperties().filter(p=>shortlist.includes(p.id)):properties.filter(matches);
  r.sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(a.price??Infinity)-(b.price??Infinity));
  $('count').textContent=`${r.length} matching ${r.length===1?'property':'properties'}`;
- $('results').innerHTML=r.length?r.map(card).join(''):`<div class="empty">${loading?'Loading listings…':currentTab==='shortlist'?'Your shortlist is empty.':!properties.length?'No listing data is available. Connect to the internet and refresh.':'No properties match. Try widening the search or including unknown data.'}</div>`;
+ $('results').innerHTML=r.length?r.map(card).join(''):`<div class="empty">${loading?'Loading listings…':currentTab==='shortlist'?'Your shortlist is empty.':!properties.length?'No listing data is available. Connect to the internet and refresh.':'No properties match. Try widening your search or leaving size minimums blank.'}</div>`;
 }
 function remember(p){let saved=readJSON('gp_property_snapshots',{});if(!saved||typeof saved!=='object'||Array.isArray(saved))saved={};saved[p.id]=p;storage.setItem('gp_property_snapshots',JSON.stringify(saved))}
 function toggleShort(id){const next=shortlist.includes(id)?shortlist.filter(x=>x!==id):[...shortlist,id];if(storage.setItem('gp_shortlist',JSON.stringify(next))){shortlist=next;const p=allProperties().find(p=>p.id===id);if(p)remember(p);runSearch()}}

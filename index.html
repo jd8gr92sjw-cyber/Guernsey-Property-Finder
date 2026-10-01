@@ -31,7 +31,7 @@ main{max-width:1150px;margin:auto;padding:15px}.panel{background:#fff;border:1px
 <div><label for="maxPrice">MAX PRICE (£)</label><input id="maxPrice" type="number" value="895000"></div>
 <div><label for="beds">MIN BEDROOMS</label><select id="beds"><option value="">Any</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select></div>
 <div><label for="type">PROPERTY TYPE</label><select id="type"><option value="">Any</option><option>Bungalow</option><option>Chalet bungalow</option><option>House</option><option>Cottage</option><option>Apartment</option></select></div>
-<div><label for="plot">MIN PLOT (ACRES)</label><input id="plot" type="number" step=".05" value=".5"></div>
+<div><label for="plot">MIN PLOT (ACRES)</label><input id="plot" type="number" step=".05" placeholder="e.g. 0.5"></div>
 <div><label for="area">MIN FLOOR AREA (SQ FT)</label><input id="area" type="number" placeholder="e.g. 1500"></div>
 <div><label for="parish">PARISH</label><select id="parish"><option value="">Any parish</option><option>Castel</option><option>Forest</option><option>St Andrew's</option><option>St Martin's</option><option>St Peter Port</option><option>St Peter's</option><option>St Sampson's</option><option>St Saviour's</option><option>Vale</option><option>Torteval</option></select></div>
 <div><label for="status">STATUS</label><select id="status"><option value="">For sale (including under offer)</option><option value="available">Available only</option><option value="new">New to market</option><option value="under">Under offer</option><option value="sold">Sold</option></select></div>
@@ -44,7 +44,7 @@ main{max-width:1150px;margin:auto;padding:15px}.panel{background:#fff;border:1px
 <label><input id="development" type="checkbox"> Development / extension potential</label>
 <label><input id="unknown" type="checkbox" checked> Include unknown bedrooms / type</label>
 </div>
-<p class="hint">Missing feature details stay as possible matches, marked unknown. Known features that fail your criteria are excluded.</p>
+<p class="hint">Entered plot and floor-area minimums require confirmed sizes. Other missing feature details stay as possible matches, marked unknown. Known features that fail your criteria are excluded.</p>
 <div class="actions"><button class="btn primary tab active" onclick="setTab('search',this)">Search</button><button class="btn secondary tab" onclick="setTab('shortlist',this)">⭐ Shortlist</button><button class="btn secondary" onclick="resetSearch()">Clear</button><button class="btn secondary" onclick="saveSearch()">Save this search</button></div>
 </section>
 

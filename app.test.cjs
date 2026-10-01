@@ -27,7 +27,6 @@ test('unknown features remain possible matches, while explicit failures are excl
  const t=await boot();t.e.unknown.checked=false;
  const p={price:850000,beds:3,type:'House',parish:'Vale',status:'sale',plot:null,area:null,parking:null,south:null,garden:null,refurb:null,development:null};
  for(const k of ['parking','south','garden','refurb','development'])t.e[k].checked=true;
- t.e.area.value='1500';
  const matches=p=>t.run(`matches(${JSON.stringify(p)})`);
  assert.equal(matches(p),true);
  for(const k of ['south','garden','refurb','development']){
@@ -36,9 +35,12 @@ test('unknown features remain possible matches, while explicit failures are excl
   const missing={...p};delete missing[k];assert.equal(matches(missing),true,k+' not supplied');
  }
  for(const [k,min] of [['plot',.5],['area',1500],['parking',3]]){
+  if(k!=='parking')t.e[k].value=String(min);
+  assert.equal(matches(p),k==='parking',k+' unknown size');
   assert.equal(matches({...p,[k]:0}),false,k+' known zero');
   assert.equal(matches({...p,[k]:min-.1}),false,k+' below minimum');
   assert.equal(matches({...p,[k]:min}),true,k+' at minimum');
+  if(k!=='parking')t.e[k].value='';
  }
  assert.equal(matches({...p,beds:2}),false);
  assert.equal(matches({...p,beds:null}),false);
@@ -89,4 +91,25 @@ test('New today uses Guernsey calendar dates, rejects missing dates and preserve
  t.run('saveSearch()');t.e.newToday.checked=false;t.run('loadSaved()');assert.equal(t.e.newToday.checked,true);
  t.run('resetSearch()');assert.equal(t.e.newToday.checked,false);
  t.data.set('gp_saved',JSON.stringify({minPrice:'800000'}));t.run('loadSaved()');assert.equal(t.e.newToday.checked,false);
+});
+
+test('50 acres and 50000 sq ft exclude unknown and undersized listings in either unknown mode',async()=>{
+ const t=await boot();t.run('resetSearch()');
+ const p={...t.getFeed().properties[0],plot:50,area:50000};
+ t.e.plot.value='50';t.e.area.value='50000';
+ const matches=p=>t.run(`matches(${JSON.stringify(p)})`);
+ for(const unknown of [true,false]){
+  t.e.unknown.checked=unknown;
+  assert.equal(matches(p),true);
+  for(const k of ['plot','area']){
+   assert.equal(matches({...p,[k]:null}),false);
+   const missing={...p};delete missing[k];assert.equal(matches(missing),false);
+   assert.equal(matches({...p,[k]:p[k]-1}),false);
+  }
+ }
+ t.e.plot.value='';assert.equal(matches({...p,plot:null}),true);
+ t.e.area.value='';assert.equal(matches({...p,plot:null,area:null}),true);
+ t.e.plot.value='50';t.e.area.value='50000';t.run('saveSearch();resetSearch();loadSaved()');
+ assert.equal(t.e.plot.value,'50');assert.equal(t.e.area.value,'50000');
+ assert.equal(matches({...p,plot:null,area:null}),false);
 });
