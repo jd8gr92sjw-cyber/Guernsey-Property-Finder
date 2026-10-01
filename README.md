@@ -7,7 +7,11 @@ hosting and GitHub Actions. The app and collector run independently of the
 original computer. The original working local app is preserved separately.
 
 ## Collection and hosting
-- Cooper Brouard residential sales, including Local and Open Market properties.
+- Cooper Brouard and Swoffers residential sales, including Local and Open Market properties.
+- Only positive numerical asking prices are collected. POA, Price on Application,
+  Price on Request and missing-price listings are excluded from both agents.
+- Swoffers pagination totals and source type filters are checked before publication.
+  Both agents must finish successfully before the combined feed replaces the previous one.
 - Scheduled collection at 02:23, 08:23, 14:23 and 20:23 UTC every day.
   GitHub may delay scheduled jobs; the app shows the actual collection time.
 - Pushes to main and manual workflow runs also collect, test and deploy.
@@ -22,7 +26,15 @@ immediate cloud collection, open Actions > Collect and deploy property finder >
 Run workflow. Check Actions if the collection timestamp becomes stale. GitHub
 can disable schedules after 60 days of repository inactivity.
 
-## Validation
+## Swoffers integration
+
+The same collector command and six-hour schedule now collect both agents. Cooper
+Brouard IDs remain unchanged; Swoffers uses negative source IDs to avoid conflicts
+with existing notes and shortlists. Search, details and photographs support both
+agents without changing the layout. Previously saved property snapshots and notes
+are retained, even when a listing is removed from the current feed.
+
+## Original deployment validation
 The first cloud workflow successfully collected 114 properties, passed the 12
 application/collector tests, preserved the feed and deployed the HTTPS site:
 https://github.com/jd8gr92sjw-cyber/Guernsey-Property-Finder/actions/runs/36685983598
