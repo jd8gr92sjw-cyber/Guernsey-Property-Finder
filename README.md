@@ -73,8 +73,9 @@ qualifications and source wording in the property details. It does not estimate
 land from photographs, sum separate parcels, infer total floor area from room
 dimensions, or convert unsupported land units.
 
-Conflicting amounts/qualifications, ranges and partial land measurements remain
-unconfirmed and cannot meet a plot minimum. An upper bound such as "under half
+Conflicting figures use the smaller stated amount and are flagged in the app.
+When amounts are equal, the stricter qualification is retained. Ranges and
+partial land measurements remain unconfirmed. An upper bound such as "under half
 an acre" cannot establish a minimum. Approximate sizes are compared at their
 advertised value and visibly labelled; check the original agent listing before
 relying on a threshold. Floor-area collection remains a separate future step.

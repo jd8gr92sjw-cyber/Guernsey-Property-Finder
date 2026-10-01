@@ -16,9 +16,9 @@ function isNew(p){return p.date&&Date.now()-Date.parse(p.date)>=0&&Date.now()-Da
 function plotLabel(p){
  if(p.plot==null)return p.plotEvidence?.length?'Plot total unconfirmed':'Plot unknown';
  const prefix={approximate:'Approx. ',lower:p.plotModifier==='at least'?'At least ':'Over ',upper:/^(up to|at most)$/.test(p.plotModifier||'')?'Up to ':'Under '}[p.plotQualifier]||'';
- return prefix+p.plot+' acre'+(p.plot===1?'':'s');
+ return prefix+p.plot+' acre'+(p.plot===1?'':'s')+(p.plotConflict?' (smaller conflicting figure)':'');
 }
-function plotEvidenceHtml(p){return p.plotEvidence?.length?`<h3>Agent's plot-size wording</h3><ul>${p.plotEvidence.map(e=>`<li>${esc(e.wording)}</li>`).join('')}</ul><p class="source-note">Separate parcels have not been added into a total. Approximate and bounded measurements retain the agent's qualifications.</p>`:''}
+function plotEvidenceHtml(p){return p.plotEvidence?.length?`<h3>Agent's plot-size wording</h3>${p.plotConflict?'<p class="source-note">Advertised figures conflict. The smaller figure is shown, retaining the stricter qualification when the figures are equal.</p>':''}<ul>${p.plotEvidence.map(e=>`<li>${esc(e.wording)}</li>`).join('')}</ul><p class="source-note">Separate parcels have not been added into a total. Approximate and bounded measurements retain the agent's qualifications.</p>`:''}
 const localListingDay=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Guernsey',year:'numeric',month:'2-digit',day:'2-digit'});
 function isNewToday(p,now=Date.now()){
  if(typeof p.date!=='string'||!p.date.trim())return false;

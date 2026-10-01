@@ -40,16 +40,19 @@ function advertisedPlot(...sources){
       const modifier=(m[1]||'').toLowerCase();
       const qualifier=/under|less than|up to|at most|nearly|almost/.test(modifier)?'upper':/over|more than|in excess|at least/.test(modifier)?'lower':modifier?'approximate':'exact';
       const range=/(?:\d|half|quarter|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:[-–—/]|to|and)\s*$/i.test(before)||/\bbetween\s+[^.!?]{0,30}$/i.test(before)||/[.,−-]\s*$/.test(before);
-      const partial=/\b(?:additional|further|separate)\s+(?:[\w.]+\s+){0,6}(?:land|field|parcel|acres?)\b/i.test(context)||/\bagricultural\s+(?:field|land)\b/i.test(context);
+      const partial=/\b(?:additional|further|separate)\s+(?:[\w.]+\s+){0,6}(?:land|field|parcel|acres?)\b/i.test(context)||/\bagricultural\s+(?:field|land)\b/i.test(context)||/\bplus\s+(?:a\s+)?(?:field|parcel|land|garden)\b/i.test(context);
       const quote=context.trim();
       if(!evidence.some(e=>e.value===amount&&e.qualifier===qualifier&&e.modifier===modifier&&e.partial===partial&&e.range===range))evidence.push({value:amount,qualifier,modifier,partial,range,wording:quote});
     }
   }
   if(!evidence.length)return {plot:null};
-  // Never add separate parcels or turn a range/contradiction into an invented total.
+  // Never add separate parcels or turn a range into an invented total.
   const distinct=new Set(evidence.map(e=>e.value+':'+e.qualifier));
-  if(distinct.size!==1||evidence.some(e=>e.partial||e.range))return {plot:null,plotQualifier:'unconfirmed',plotEvidence:evidence};
-  return {plot:evidence[0].value,plotQualifier:evidence[0].qualifier,plotModifier:evidence[0].modifier,plotEvidence:evidence};
+  if(evidence.some(e=>e.partial||e.range))return {plot:null,plotQualifier:'unconfirmed',plotEvidence:evidence};
+  const smallest=Math.min(...evidence.map(e=>e.value));
+  const priority={upper:0,approximate:1,exact:2,lower:3};
+  const chosen=evidence.filter(e=>e.value===smallest).sort((a,b)=>priority[a.qualifier]-priority[b.qualifier])[0];
+  return {plot:chosen.value,plotQualifier:chosen.qualifier,plotModifier:chosen.modifier,plotConflict:distinct.size>1,plotEvidence:evidence};
 }
 async function request(url) {
   if(![ORIGIN,SWOFFERS].includes(new URL(url).origin))throw Error('Unexpected collection origin');

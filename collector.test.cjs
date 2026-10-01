@@ -97,7 +97,7 @@ test('advertised plot sizes preserve explicit numbers and qualifications',()=>{
   ['A 0.75-acre plot.',.75,'exact']
  ]){const p=advertisedPlot(wording);assert.equal(p.plot,value,wording);assert.equal(p.plotQualifier,qualifier);assert.ok(p.plotEvidence[0].wording.includes('acre'))}
 });
-test('plot extraction leaves conflicting, partial, range and unrelated measurements unconfirmed',()=>{
+test('plot extraction leaves partial, range and unrelated measurements unconfirmed',()=>{
  for(const wording of [
   'Gardens of 1.5 acres plus a field of 2 acres.',
   'A further parcel of 0.84 acres.',
@@ -111,14 +111,17 @@ test('plot extraction leaves conflicting, partial, range and unrelated measureme
   'The nearby park has 20 acres.',
   'No plot size stated; kitchen 5m x 4m.'
  ])assert.equal(advertisedPlot(wording).plot,null,wording);
- assert.equal(advertisedPlot('A plot of around half an acre.','A plot of just under half an acre.').plot,null);
+ const conflict=advertisedPlot('A plot of around half an acre.','A plot of just under half an acre.');
+ assert.equal(conflict.plot,.5);assert.equal(conflict.plotQualifier,'upper');assert.equal(conflict.plotConflict,true);
+ const different=advertisedPlot('A total site of 2.5 acres.','A total site of 2 acres.');
+ assert.equal(different.plot,2);assert.equal(different.plotConflict,true);assert.equal(different.plotEvidence.length,2);
  assert.equal(advertisedPlot('Total site of 2.5 acres.','Total site of 2.5 acres.').plot,2.5);
 });
 test('both property parsers collect plot evidence from their listing descriptions and features',()=>{
  const cb=parseProperty(html({description:'A site of approximately 0.6 acres.'}),card,'now');
  assert.equal(cb.plot,.6);assert.equal(cb.plotQualifier,'approximate');assert.equal(cb.area,null);
  const conflict=parseProperty(html({description:'A plot of around half an acre.'})+'<div class="cb-single-property-key-features"><ul><li>Plot just under half an acre</li></ul></div>',card,'now');
- assert.equal(conflict.plot,null);assert.equal(conflict.plotEvidence.length,2);
+ assert.equal(conflict.plot,.5);assert.equal(conflict.plotQualifier,'upper');assert.equal(conflict.plotEvidence.length,2);
  const sw=parseSwoffersProperty(swoffersDetail().replace('A coastal home.','A total site of 2.5 acres.'),sc(),'now');
  assert.equal(sw.plot,2.5);assert.equal(sw.plotQualifier,'exact');assert.equal(sw.area,null);
  const featureOnly=parseSwoffersProperty(swoffersDetail()+'<meta property="og:description" content="Gardens of approx 1 acre">',sc(),'now');
