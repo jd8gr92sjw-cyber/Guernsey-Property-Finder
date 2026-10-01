@@ -14,7 +14,7 @@ test('corrupt stored JSON does not break startup; source strings are escaped',as
 
 test('Swoffers properties work in search, shortlist and detail without colliding with Cooper Brouard',async()=>{
  const t=await boot(),p={...t.getFeed().properties[0],id:-32835,name:'Swoffers test',agent:'Swoffers',source:'swoffers',price:360000,url:'https://swoffers.co.uk/property/example',photos:['https://assets.reapit.net/swf/live/pictures/example.jpg']};
- t.setFeed({...t.getFeed(),agent:'Cooper Brouard and Swoffers',properties:[...t.getFeed().properties,p]});await t.context.loadListings();t.run('resetSearch();toggleShort(-32835);toggleShort(88467);currentTab="shortlist";runSearch()');
+ t.setFeed({...t.getFeed(),agent:'Cooper Brouard and Swoffers',properties:[...t.getFeed().properties.filter(existing=>existing.id!==p.id),p]});await t.context.loadListings();t.run('resetSearch();toggleShort(-32835);toggleShort(88467);currentTab="shortlist";runSearch()');
  assert.equal(t.e.count.textContent,'2 matching properties');t.run('showDetail(-32835)');assert.match(t.e.detail.innerHTML,/Source: Swoffers/);assert.match(t.e.detail.innerHTML,/assets.reapit.net/);assert.match(t.e.detail.innerHTML,/https:\/\/swoffers.co.uk\/property\/example/);
  t.e['note_-32835'].value='Swoffers note';t.run('saveNote(-32835)');assert.equal(t.data.get('note_-32835'),'Swoffers note');assert.notEqual(t.data.get('note_88467'),'Swoffers note');
  assert.match(t.e.dataStatus.textContent,/Cooper Brouard and Swoffers/);
