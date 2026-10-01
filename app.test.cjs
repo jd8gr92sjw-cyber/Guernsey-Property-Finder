@@ -55,12 +55,16 @@ test('unknown features remain possible matches, while explicit failures are excl
 });
 
 test('default search with unknown bedrooms disabled retains listings from both agents',async()=>{
- const t=await boot();t.e.unknown.checked=false;t.run('runSearch()');
+ const t=await boot();
+ // Fixed fixtures keep future collections from failing when the market changes.
+ const featureUnknowns={price:850000,beds:3,plot:null,area:null,parking:null,south:null,garden:null,refurb:null,development:null};
+ const fixtures=['cooper-brouard','swoffers'].map(source=>({...t.getFeed().properties.find(p=>p.source===source),...featureUnknowns}));
+ t.setFeed({...t.getFeed(),properties:fixtures});await t.context.loadListings();
+ t.e.unknown.checked=false;t.run('runSearch()');
  const matches=t.run('properties.filter(matches)');assert.ok(matches.length>0);
  assert.ok(matches.some(p=>p.source==='cooper-brouard'));
  assert.ok(matches.some(p=>p.source==='swoffers'));
  assert.ok(matches.every(p=>p.price>=800000&&p.price<=895000&&p.beds>=3));
- console.log('Default criteria, unknown bedrooms disabled:',matches.length,'possible matches');
  t.run('saveSearch()');t.e.unknown.checked=true;t.run('loadSaved()');assert.equal(t.e.unknown.checked,false);
  assert.equal(t.e.count.textContent,`${matches.length} matching properties`);
 });
