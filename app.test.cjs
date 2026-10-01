@@ -1,5 +1,16 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const vm=require('node:vm');const path=require('node:path');
 const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),script=fs.readFileSync(path.join(__dirname,'app.js'),'utf8');
+test('duplicate agents use smaller plot before filtering and preserve saved listings',async()=>{
+ const t=await boot();const base={...t.getFeed().properties[0],name:'Same House',address:'Test Road',parish:'Vale',market:'Local Market',plot:2,plotQualifier:'exact'};
+ const cb={...base,id:900001,source:'cooper-brouard',agent:'Cooper Brouard'},sw={...base,id:-900001,source:'swoffers',agent:'Swoffers',address:'Test Road, Vale',plot:1,url:'https://swoffers.co.uk/property/test'};
+ t.setFeed({...t.getFeed(),properties:[cb,sw]});await t.context.loadListings();t.run('resetSearch()');assert.equal(t.e.count.textContent,'1 matching property');assert.equal(t.run('searchProperties()[0].id'),sw.id);
+ t.e.plot.value='1.5';t.run('runSearch()');assert.equal(t.e.count.textContent,'0 matching properties');
+ t.run('showDetail(-900001)');assert.match(t.e.detail.innerHTML,/Also advertised by/);assert.match(t.e.detail.innerHTML,/Cooper Brouard/);assert.match(t.e.detail.innerHTML,/Swoffers/);
+ t.run('toggleShort(900001);currentTab="shortlist";runSearch()');assert.equal(t.e.count.textContent,'1 matching property');assert.match(t.e.results.innerHTML,/Cooper Brouard/);
+ for(const different of [{address:'Other Road, Vale'},{parish:'Castel'},{market:'Open Market'},{name:'Other House'},{plot:null},{source:'cooper-brouard'}]){
+  t.setFeed({...t.getFeed(),properties:[cb,{...sw,...different}]});await t.context.loadListings();assert.equal(t.run('searchProperties().length'),2);
+ }
+});
 async function boot(initial={}){
  const elements={},data=new Map(Object.entries(initial));
  for(const m of html.matchAll(/<\w+[^>]*id="([^"]+)"[^>]*>/g))elements[m[1]]={value:(m[0].match(/value="([^"]*)"/)||[])[1]||'',checked:/\schecked/.test(m[0]),type:(m[0].match(/type="([^"]*)"/)||[])[1]||'',style:{},classList:{add(){},remove(){}}};elements.beds.value='3';
