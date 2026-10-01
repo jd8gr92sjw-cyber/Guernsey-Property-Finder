@@ -22,3 +22,45 @@ test('Swoffers properties work in search, shortlist and detail without colliding
 test('old cached feeds cannot reintroduce unpriced search results',async()=>{
  const t=await boot();t.setFeed({...t.getFeed(),properties:[...t.getFeed().properties,{...t.getFeed().properties[0],id:999999,price:null}]});await t.context.loadListings();t.run('resetSearch()');assert.equal(t.run('properties.some(p=>p.price===null)'),false);
 });
+
+test('unknown features remain possible matches, while explicit failures are excluded',async()=>{
+ const t=await boot();t.e.unknown.checked=false;
+ const p={price:850000,beds:3,type:'House',parish:'Vale',status:'sale',plot:null,area:null,parking:null,south:null,garden:null,refurb:null,development:null};
+ for(const k of ['parking','south','garden','refurb','development'])t.e[k].checked=true;
+ t.e.area.value='1500';
+ const matches=p=>t.run(`matches(${JSON.stringify(p)})`);
+ assert.equal(matches(p),true);
+ for(const k of ['south','garden','refurb','development']){
+  assert.equal(matches({...p,[k]:false}),false,k+' explicitly absent');
+  assert.equal(matches({...p,[k]:true}),true,k+' confirmed');
+  const missing={...p};delete missing[k];assert.equal(matches(missing),true,k+' not supplied');
+ }
+ for(const [k,min] of [['plot',.5],['area',1500],['parking',3]]){
+  assert.equal(matches({...p,[k]:0}),false,k+' known zero');
+  assert.equal(matches({...p,[k]:min-.1}),false,k+' below minimum');
+  assert.equal(matches({...p,[k]:min}),true,k+' at minimum');
+ }
+ assert.equal(matches({...p,beds:2}),false);
+ assert.equal(matches({...p,beds:null}),false);
+ t.e.type.value='House';assert.equal(matches({...p,type:null}),false);
+ t.e.unknown.checked=true;
+ assert.equal(matches({...p,beds:null,type:null}),true);
+ assert.equal(matches({...p,south:false}),false);
+ assert.equal(matches({...p,price:900000}),false);
+ assert.equal(matches({...p,type:'Apartment'}),false);
+ t.e.parish.value='Castel';assert.equal(matches(p),false);
+ t.e.parish.value='';t.e.status.value='under';assert.equal(matches(p),false);
+ t.e.status.value='';assert.equal(matches({...p,unavailable:true}),false);
+ assert.match(t.run(`card(${JSON.stringify({...t.getFeed().properties[0],...p})})`),/badge unknown/);
+});
+
+test('default search with unknown bedrooms disabled retains listings from both agents',async()=>{
+ const t=await boot();t.e.unknown.checked=false;t.run('runSearch()');
+ const matches=t.run('properties.filter(matches)');assert.ok(matches.length>0);
+ assert.ok(matches.some(p=>p.source==='cooper-brouard'));
+ assert.ok(matches.some(p=>p.source==='swoffers'));
+ assert.ok(matches.every(p=>p.price>=800000&&p.price<=895000&&p.beds>=3));
+ console.log('Default criteria, unknown bedrooms disabled:',matches.length,'possible matches');
+ t.run('saveSearch()');t.e.unknown.checked=true;t.run('loadSaved()');assert.equal(t.e.unknown.checked,false);
+ assert.equal(t.e.count.textContent,`${matches.length} matching properties`);
+});
