@@ -1,5 +1,18 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const vm=require('node:vm');const path=require('node:path');
 const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),script=fs.readFileSync(path.join(__dirname,'app.js'),'utf8');
+test('price descending sorts filtered search and shortlist while newest remains default',async()=>{
+ const t=await boot();const base={...t.getFeed().properties[0],source:'cooper-brouard',market:'Local Market',plot:null,area:null};
+ const p=[{...base,id:910001,name:'Cheap newest',price:400000,date:'2026-10-01'},{...base,id:910002,name:'Expensive older',price:900000,date:'2026-09-01'},{...base,id:910003,name:'Middle',price:600000,date:'2026-09-15'}];
+ t.setFeed({...t.getFeed(),properties:p});await t.context.loadListings();t.run('resetSearch()');
+ const order=()=>[...t.e.results.innerHTML.matchAll(/class="name">([^<]+)/g)].map(m=>m[1]);
+ assert.deepEqual(order(),['Cheap newest','Middle','Expensive older']);
+ t.e.sort.value='price-desc';t.run('runSearch()');assert.deepEqual(order(),['Expensive older','Middle','Cheap newest']);
+ t.e.maxPrice.value='700000';t.run('runSearch()');assert.deepEqual(order(),['Middle','Cheap newest']);
+ t.e.sort.value='price-asc';t.run('runSearch()');assert.deepEqual(order(),['Cheap newest','Middle']);t.e.sort.value='price-desc';
+ t.run('toggleShort(910001);toggleShort(910002);currentTab="shortlist";runSearch()');assert.deepEqual(order(),['Expensive older','Cheap newest']);
+ t.e.sort.value='price-asc';t.run('runSearch()');assert.deepEqual(order(),['Cheap newest','Expensive older']);
+ t.e.sort.value='';t.run('runSearch()');assert.deepEqual(order(),['Cheap newest','Expensive older']);
+});
 test('market filters both agents, combines with criteria and survives saved searches',async()=>{
  const t=await boot();t.run('resetSearch()');const base={...t.getFeed().properties[0],name:'Market fixture',price:850000,beds:3,parish:'Vale',plot:null,area:null};
  const fixtures=[{...base,id:900002,source:'cooper-brouard',market:'Local Market'},{...base,id:-900002,source:'swoffers',market:'Open Market'}];

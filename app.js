@@ -88,7 +88,8 @@ function searchProperties(){
 function duplicateEvidenceHtml(p){return p.duplicateListings?`<h3>Also advertised by</h3><p class="source-note">One search result is shown using the smaller advertised plot figure. Both original listings remain available.</p><ul>${p.duplicateListings.map(q=>`<li><a href="${esc(safeUrl(q.url))}" target="_blank" rel="noopener noreferrer">${esc(q.agent)}</a>: ${esc(plotLabel(q))}</li>`).join('')}</ul>`:''}
 function runSearch(){
  const r=currentTab==='shortlist'?allProperties().filter(p=>shortlist.includes(p.id)):searchProperties().filter(matches);
- r.sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(a.price??Infinity)-(b.price??Infinity));
+ const newest=(a,b)=>(b.date||'').localeCompare(a.date||'')||(a.price??Infinity)-(b.price??Infinity);
+ r.sort(val('sort')==='price-desc'?(a,b)=>(b.price??-Infinity)-(a.price??-Infinity)||newest(a,b):val('sort')==='price-asc'?(a,b)=>(a.price??Infinity)-(b.price??Infinity)||newest(a,b):newest);
  const uncertain=currentTab==='search'?r.filter(p=>unconfirmedSizes(p).length).length:0;
  $('count').textContent=`${r.length} matching ${r.length===1?'property':'properties'}${uncertain?' · '+uncertain+' with size unconfirmed':''}`;
  $('results').innerHTML=r.length?r.map(card).join(''):`<div class="empty">${loading?'Loading listings…':currentTab==='shortlist'?'Your shortlist is empty.':!properties.length?'No listing data is available. Connect to the internet and refresh.':'No properties match. Try widening your search or leaving size minimums blank.'}</div>`;

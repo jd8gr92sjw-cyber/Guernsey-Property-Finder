@@ -52,7 +52,7 @@ main{max-width:1150px;margin:auto;padding:15px}.panel{background:#fff;border:1px
 <section id="savedPanel" class="panel" style="display:none"><b>Saved search</b><p style="color:var(--muted);font-size:13px">Your current criteria are saved locally on this device.</p><div id="savedText"></div><div class="actions"><button class="btn primary" onclick="loadSaved()">Load saved search</button><button class="btn secondary" onclick="deleteSaved()">Delete</button></div></section>
 
 <section id="listPanel">
-<div class="summary"><div><b id="count"></b></div><div class="hint">Photographs and descriptions © the listing agents / their owners</div></div>
+<div class="summary"><div><b id="count"></b></div><div><label for="sort">SORT BY</label><select id="sort" onchange="runSearch()"><option value="">Newest first</option><option value="price-desc">Price: high to low</option><option value="price-asc">Price: low to high</option></select></div><div class="hint">Photographs and descriptions © the listing agents / their owners</div></div>
 <div id="results" class="cards"></div>
 </section>
 
