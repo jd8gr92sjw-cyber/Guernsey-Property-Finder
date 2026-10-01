@@ -1,5 +1,19 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const vm=require('node:vm');const path=require('node:path');
 const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),script=fs.readFileSync(path.join(__dirname,'app.js'),'utf8');
+test('market filters both agents, combines with criteria and survives saved searches',async()=>{
+ const t=await boot();t.run('resetSearch()');const base={...t.getFeed().properties[0],name:'Market fixture',price:850000,beds:3,parish:'Vale',plot:null,area:null};
+ const fixtures=[{...base,id:900002,source:'cooper-brouard',market:'Local Market'},{...base,id:-900002,source:'swoffers',market:'Open Market'}];
+ t.setFeed({...t.getFeed(),properties:fixtures});await t.context.loadListings();assert.equal(t.e.count.textContent,'2 matching properties');
+ for(const market of ['Local Market','Open Market']){
+  t.e.market.value=market;t.run('runSearch()');assert.equal(t.e.count.textContent,'1 matching property');assert.equal(t.run('properties.filter(matches)[0].market'),market);
+ }
+ t.e.unknown.checked=true;assert.equal(t.run(`matches(${JSON.stringify({...base,market:null})})`),false);
+ t.e.parish.value='Castel';t.run('runSearch()');assert.equal(t.e.count.textContent,'0 matching properties');t.e.parish.value='';
+ t.e.minPrice.value='900000';t.run('runSearch()');assert.equal(t.e.count.textContent,'0 matching properties');t.e.minPrice.value='800000';
+ t.e.market.value='Local Market';t.run('saveSearch();resetSearch()');assert.equal(t.e.market.value,'');t.run('loadSaved()');assert.equal(t.e.market.value,'Local Market');assert.equal(t.e.count.textContent,'1 matching property');assert.match(t.e.savedText.textContent,/Local Market/);
+ t.data.set('gp_saved',JSON.stringify({minPrice:'800000'}));t.run('loadSaved()');assert.equal(t.e.market.value,'');assert.equal(t.e.count.textContent,'2 matching properties');
+ assert.ok(html.indexOf('for="market"')<html.indexOf('for="minPrice"'));
+});
 test('floor minimum filters collected totals, labels qualifications and escapes evidence',async()=>{
  const t=await boot();t.run('resetSearch()');t.e.area.value='2500';t.e.unknown.checked=false;
  const p={...t.getFeed().properties[0],area:3000,areaQualifier:'approximate',areaEvidence:[{wording:'Approximately 3000 sqft',unit:'sq ft'}]};

@@ -26,6 +26,7 @@ main{max-width:1150px;margin:auto;padding:15px}.panel{background:#fff;border:1px
 <button id="refreshData" class="btn secondary" onclick="refreshListings()">Refresh listings</button><p id="actionStatus" role="status" aria-live="polite"></p><p id="appStatus" class="hint" role="status" aria-live="polite"></p>
 
 <section id="searchPanel" class="panel">
+<div style="margin-bottom:14px"><label for="market">MARKET</label><select id="market"><option value="">Both</option><option>Open Market</option><option>Local Market</option></select></div>
 <div class="grid">
 <div><label for="minPrice">MIN PRICE (£)</label><input id="minPrice" type="number" value="800000"></div>
 <div><label for="maxPrice">MAX PRICE (£)</label><input id="maxPrice" type="number" value="895000"></div>

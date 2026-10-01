@@ -1,7 +1,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const ids=['minPrice','maxPrice','beds','type','plot','area','parish','status','parking','south','garden','refurb','development','unknown','newToday'];
+const ids=['market','minPrice','maxPrice','beds','type','plot','area','parish','status','parking','south','garden','refurb','development','unknown','newToday'];
 const storage={getItem(key){try{return localStorage.getItem(key)}catch{return null}},setItem(key,value){try{localStorage.setItem(key,value);return true}catch{notify('Unable to save on this device. Check browser storage permissions.');return false}},removeItem(key){try{localStorage.removeItem(key);return true}catch{notify('Unable to delete saved data.');return false}}};
 function notify(message){$('actionStatus').textContent=message}
 function readJSON(key,fallback){try{return JSON.parse(storage.getItem(key))??fallback}catch{return fallback}}
@@ -48,6 +48,7 @@ function unconfirmedSizes(p){return ['plot','area'].filter(k=>sizeState(p,k)==='
 function sizeNotice(p){const sizes=unconfirmedSizes(p);return currentTab==='search'&&sizes.length?`<p class="source-note">Size unconfirmed: ${sizes.join(' and ')} minimum not verified.</p>`:''}
 function matches(p){
  if(p.unavailable)return false;
+ if(val('market')&&p.market!==val('market'))return false;
  if(checked('newToday')&&!isNewToday(p))return false;
  const min=Number(val('minPrice'))||0,max=val('maxPrice')===''?Infinity:Number(val('maxPrice'));
  if(p.price==null){if((min||max!==Infinity)&&!checked('unknown'))return false}else if(p.price<min||p.price>max)return false;
@@ -105,9 +106,9 @@ function saveNote(id){if(storage.setItem('note_'+id,$('note_'+id).value))notify(
 function hideDetail(){currentDetail=null;$('detail').className='detail';$('searchPanel').style.display=currentTab==='saved'?'none':'block';$('listPanel').style.display='block';runSearch()}
 function setTab(t,el){currentTab=t;currentDetail=null;$('detail').className='detail';$('listPanel').style.display=t==='saved'?'none':'block';document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));el.classList.add('active');$('searchPanel').style.display=t==='saved'?'none':'block';$('savedPanel').style.display=t==='saved'?'block':'none';runSearch();updateSaved()}
 function saveSearch(){const o={};ids.forEach(id=>o[id]=$(id).type==='checkbox'?checked(id):val(id));if(storage.setItem('gp_saved',JSON.stringify(o)))notify('Search saved on this device.')}
-function loadSaved(){const o=savedCriteria();if(!o)return;ids.forEach(id=>{if(!(id in o))return;if($(id).type==='checkbox')$(id).checked=o[id]===true;else if(['string','number'].includes(typeof o[id]))$(id).value=o[id]});setTab('search',document.querySelector('.tab'))}
+function loadSaved(){const o=savedCriteria();if(!o)return;if(!('market' in o))$('market').value='';ids.forEach(id=>{if(!(id in o))return;if($(id).type==='checkbox')$(id).checked=o[id]===true;else if(['string','number'].includes(typeof o[id]))$(id).value=o[id]});setTab('search',document.querySelector('.tab'))}
 function deleteSaved(){if(storage.removeItem('gp_saved'))updateSaved()}
-function updateSaved(){const o=savedCriteria();$('savedText').textContent=o?`Saved criteria: £${o.minPrice||'any'}–£${o.maxPrice||'any'}, ${o.beds||'any'}+ beds, ${o.type||'any type'}, ${o.parish||'any parish'}, ${o.plot||'any'}+ acre plot.`:'No saved search yet.'}
+function updateSaved(){const o=savedCriteria();$('savedText').textContent=o?`Saved criteria: ${o.market||'Both markets'}, £${o.minPrice||'any'}–£${o.maxPrice||'any'}, ${o.beds||'any'}+ beds, ${o.type||'any type'}, ${o.parish||'any parish'}, ${o.plot||'any'}+ acre plot.`:'No saved search yet.'}
 function resetSearch(){ids.forEach(id=>{if($(id).type==='checkbox')$(id).checked=id==='unknown';else $(id).value=''});runSearch()}
 function validateData(data){return data?.schemaVersion===1&&Array.isArray(data.properties)&&data.properties.length>0&&data.properties.every(p=>Number.isInteger(p.id)&&typeof p.name==='string'&&safeUrl(p.url)&&Array.isArray(p.photos)&&(p.price===null||Number.isFinite(p.price)))}
 function migrateDemo(){
