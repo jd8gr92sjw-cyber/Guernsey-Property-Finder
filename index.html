@@ -21,7 +21,7 @@ main{max-width:1150px;margin:auto;padding:15px}.panel{background:#fff;border:1px
 <body>
 <header><h1>Guernsey Property Finder</h1><p>Private property search • your shortlist in one place</p></header>
 <main>
-<p class="hint">Cooper Brouard and Swoffers residential sales · Local and Open Market. Check availability with the agent.</p><p id="dataStatus" role="status">Loading property listings…</p><button id="refreshData" class="btn secondary" onclick="refreshListings()">Refresh listings</button><p id="actionStatus" role="status" aria-live="polite"></p><p id="appStatus" class="hint" role="status" aria-live="polite"></p>
+<button id="refreshData" class="btn secondary" onclick="refreshListings()">Refresh listings</button><p id="actionStatus" role="status" aria-live="polite"></p><p id="appStatus" class="hint" role="status" aria-live="polite"></p>
 <div class="tabs">
 <button class="tab active" onclick="setTab('search',this)">Search</button>
 <button class="tab" onclick="setTab('shortlist',this)">⭐ Shortlist</button>
@@ -59,5 +59,9 @@ main{max-width:1150px;margin:auto;padding:15px}.panel{background:#fff;border:1px
 </section>
 
 <section id="detail" class="detail"></section>
+<footer class="source-note">
+<p>Cooper Brouard and Swoffers residential sales · Local and Open Market. Check availability with the agent.</p>
+<p id="dataStatus" role="status">Loading property listings…</p>
+</footer>
 </main>
 <script src="app.js" defer></script></body></html>
