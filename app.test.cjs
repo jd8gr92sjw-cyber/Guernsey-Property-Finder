@@ -1,5 +1,13 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const vm=require('node:vm');const path=require('node:path');
 const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),script=fs.readFileSync(path.join(__dirname,'app.js'),'utf8');
+test('app starts unrestricted with saved searches retained for explicit loading',async()=>{
+ const saved={minPrice:'800000',beds:'3',market:'Local Market',parking:true,unknown:true};
+ const t=await boot({gp_saved:JSON.stringify(saved)});
+ assert.equal(t.run("ids.every(id=>$(id).type==='checkbox'?!checked(id):val(id)==='')"),true);
+ assert.deepEqual(JSON.parse(t.data.get('gp_saved')),saved);
+ t.run('loadSaved()');assert.equal(t.e.minPrice.value,'800000');assert.equal(t.e.market.value,'Local Market');assert.equal(t.e.parking.checked,true);
+ t.run('resetSearch()');assert.equal(t.run("ids.every(id=>$(id).type==='checkbox'?!checked(id):val(id)==='')"),true);
+});
 test('price descending sorts filtered search and shortlist while newest remains default',async()=>{
  const t=await boot();const base={...t.getFeed().properties[0],source:'cooper-brouard',market:'Local Market',plot:null,area:null};
  const p=[{...base,id:910001,name:'Cheap newest',price:400000,date:'2026-10-01'},{...base,id:910002,name:'Expensive older',price:900000,date:'2026-09-01'},{...base,id:910003,name:'Middle',price:600000,date:'2026-09-15'}];
@@ -51,7 +59,7 @@ test('duplicate agents use smaller plot before filtering and preserve saved list
 });
 async function boot(initial={}){
  const elements={},data=new Map(Object.entries(initial));
- for(const m of html.matchAll(/<\w+[^>]*id="([^"]+)"[^>]*>/g))elements[m[1]]={value:(m[0].match(/value="([^"]*)"/)||[])[1]||'',checked:/\schecked/.test(m[0]),type:(m[0].match(/type="([^"]*)"/)||[])[1]||'',style:{},classList:{add(){},remove(){}}};elements.beds.value='3';
+ for(const m of html.matchAll(/<\w+[^>]*id="([^"]+)"[^>]*>/g))elements[m[1]]={value:(m[0].match(/value="([^"]*)"/)||[])[1]||'',checked:/\schecked/.test(m[0]),type:(m[0].match(/type="([^"]*)"/)||[])[1]||'',style:{},classList:{add(){},remove(){}}};
  let feed=JSON.parse(fs.readFileSync(path.join(__dirname,'properties.json'),'utf8'));let fail=false;
  const context={URL,Date,setTimeout,document:{getElementById:id=>elements[id]||(elements[id]={value:'',style:{}}),querySelectorAll:()=>[],querySelector:()=>({classList:{add(){}}})},localStorage:{getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k)},location:{protocol:'http:'},navigator:{},window:{},fetch:async()=>{if(fail)throw Error('offline');return {ok:true,json:async()=>feed}}};vm.createContext(context);vm.runInContext(script,context);await context.loadListings();
  return {run:s=>vm.runInContext(s,context),context,e:elements,data,setFeed:f=>feed=f,getFeed:()=>feed,setFail:v=>fail=v};
@@ -73,7 +81,7 @@ test('old cached feeds cannot reintroduce unpriced search results',async()=>{
 });
 
 test('unknown features remain possible matches, while explicit failures are excluded',async()=>{
- const t=await boot();t.e.unknown.checked=false;
+ const t=await boot();t.e.unknown.checked=false;t.e.beds.value='3';t.e.minPrice.value='800000';t.e.maxPrice.value='895000';
  const p={price:850000,beds:3,type:'House',parish:'Vale',status:'sale',plot:null,area:null,parking:null,south:null,garden:null,refurb:null,development:null};
  for(const k of ['parking','south','garden','refurb','development'])t.e[k].checked=true;
  const matches=p=>t.run(`matches(${JSON.stringify(p)})`);
@@ -178,7 +186,7 @@ test('plot bounds and approximation remain visible and cannot create false minim
 
 test('small size minima retain possibilities, label missing sizes and save the unknown setting',async()=>{
  const t=await boot();const base={...t.getFeed().properties[0],plot:null,area:null,price:850000};
- t.setFeed({...t.getFeed(),properties:[base]});await t.context.loadListings();t.run('resetSearch()');t.e.plot.value='.1';t.e.area.value='10';t.run('runSearch()');
+ t.setFeed({...t.getFeed(),properties:[base]});await t.context.loadListings();t.run('resetSearch()');t.e.unknown.checked=true;t.e.plot.value='.1';t.e.area.value='10';t.run('runSearch()');
  assert.equal(t.e.count.textContent,'1 matching property · 1 with size unconfirmed');
  assert.match(t.e.results.innerHTML,/Size unconfirmed: plot and floor area minimum not verified/);
  assert.equal(t.run(`score(${JSON.stringify(base)})`),0);

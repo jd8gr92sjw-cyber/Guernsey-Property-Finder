@@ -110,7 +110,7 @@ function saveSearch(){const o={};ids.forEach(id=>o[id]=$(id).type==='checkbox'?c
 function loadSaved(){const o=savedCriteria();if(!o)return;if(!('market' in o))$('market').value='';ids.forEach(id=>{if(!(id in o))return;if($(id).type==='checkbox')$(id).checked=o[id]===true;else if(['string','number'].includes(typeof o[id]))$(id).value=o[id]});setTab('search',document.querySelector('.tab'))}
 function deleteSaved(){if(storage.removeItem('gp_saved'))updateSaved()}
 function updateSaved(){const o=savedCriteria();$('savedText').textContent=o?`Saved criteria: ${o.market||'Both markets'}, £${o.minPrice||'any'}–£${o.maxPrice||'any'}, ${o.beds||'any'}+ beds, ${o.type||'any type'}, ${o.parish||'any parish'}, ${o.plot||'any'}+ acre plot.`:'No saved search yet.'}
-function resetSearch(){ids.forEach(id=>{if($(id).type==='checkbox')$(id).checked=id==='unknown';else $(id).value=''});runSearch()}
+function resetSearch(){ids.forEach(id=>{if($(id).type==='checkbox')$(id).checked=false;else $(id).value=''});runSearch()}
 function validateData(data){return data?.schemaVersion===1&&Array.isArray(data.properties)&&data.properties.length>0&&data.properties.every(p=>Number.isInteger(p.id)&&typeof p.name==='string'&&safeUrl(p.url)&&Array.isArray(p.photos)&&(p.price===null||Number.isFinite(p.price)))}
 function migrateDemo(){
  if(storage.getItem('gp_live_migrated')==='1')return;
@@ -132,6 +132,6 @@ async function refreshListings(){
  try{const loaded=await loadListings();if(loaded)notify('Latest published listings loaded. The cloud collector runs every six hours.');else notify('Could not load an updated feed. Previously loaded listings are retained.');}
  finally{button.disabled=false}
 }
-updateSaved();runSearch();loadListings();
+updateSaved();resetSearch();loadListings();
 if(location.protocol==='file:')$('appStatus').textContent='Open this app through localhost or HTTPS; see README.';
 else if('serviceWorker' in navigator&&window.isSecureContext){window.addEventListener('load',async()=>{try{await navigator.serviceWorker.register('./sw.js');await navigator.serviceWorker.ready;$('appStatus').textContent='App and last published listings available offline; photographs need a connection.'}catch{$('appStatus').textContent='Offline setup failed. Reconnect and reload to retry.'}})}

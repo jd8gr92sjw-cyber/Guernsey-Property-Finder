@@ -28,9 +28,9 @@ main{max-width:1150px;margin:auto;padding:15px}.panel{background:#fff;border:1px
 <section id="searchPanel" class="panel">
 <div style="margin-bottom:14px"><label for="market">MARKET</label><select id="market"><option value="">Both</option><option>Open Market</option><option>Local Market</option></select></div>
 <div class="grid">
-<div><label for="minPrice">MIN PRICE (£)</label><input id="minPrice" type="number" value="800000"></div>
-<div><label for="maxPrice">MAX PRICE (£)</label><input id="maxPrice" type="number" value="895000"></div>
-<div><label for="beds">MIN BEDROOMS</label><select id="beds"><option value="">Any</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select></div>
+<div><label for="minPrice">MIN PRICE (£)</label><input id="minPrice" type="number" value=""></div>
+<div><label for="maxPrice">MAX PRICE (£)</label><input id="maxPrice" type="number" value=""></div>
+<div><label for="beds">MIN BEDROOMS</label><select id="beds"><option value="">Any</option><option>2</option><option>3</option><option>4</option><option>5</option></select></div>
 <div><label for="type">PROPERTY TYPE</label><select id="type"><option value="">Any</option><option>Bungalow</option><option>Chalet bungalow</option><option>House</option><option>Cottage</option><option>Apartment</option></select></div>
 <div><label for="plot">MIN PLOT (ACRES)</label><input id="plot" type="number" step=".05" placeholder="e.g. 0.5"></div>
 <div><label for="area">MIN FLOOR AREA (SQ FT)</label><input id="area" type="number" placeholder="e.g. 1500"></div>
@@ -38,12 +38,12 @@ main{max-width:1150px;margin:auto;padding:15px}.panel{background:#fff;border:1px
 <div><label for="status">STATUS</label><select id="status"><option value="">For sale (including under offer)</option><option value="available">Available only</option><option value="new">New to market</option><option value="under">Under offer</option><option value="sold">Sold</option></select></div>
 </div>
 <div class="checks">
-<label><input id="parking" type="checkbox" checked> 3+ parking spaces</label>
-<label><input id="south" type="checkbox" checked> South-facing / sunny aspect</label>
-<label><input id="garden" type="checkbox" checked> Garden / outside space</label>
+<label><input id="parking" type="checkbox"> 3+ parking spaces</label>
+<label><input id="south" type="checkbox"> South-facing / sunny aspect</label>
+<label><input id="garden" type="checkbox"> Garden / outside space</label>
 <label><input id="refurb" type="checkbox"> Refurbishment potential</label>
 <label><input id="development" type="checkbox"> Development / extension potential</label>
-<label><input id="unknown" type="checkbox" checked> Include unknown data (bedrooms, type and sizes)</label>
+<label><input id="unknown" type="checkbox"> Include unknown data (bedrooms, type and sizes)</label>
 </div>
 <p class="hint">Known sizes below your minimum are excluded. With “Include unknown data” checked, missing measurements remain as possibilities labelled “Size unconfirmed”; uncheck it to require stated sizes. Plot and floor areas use explicit agent measurements, retaining approximate or bounded wording. Floor areas in square metres are converted to square feet. Many listings still omit a usable total; see property details for the source wording.</p>
 <div class="actions"><button class="btn primary tab active" onclick="setTab('search',this)">Search</button><button class="btn secondary tab" onclick="setTab('shortlist',this)">⭐ Shortlist</button><button class="btn secondary" onclick="resetSearch()">Clear</button><button class="btn secondary" onclick="saveSearch()">Save this search</button></div>
