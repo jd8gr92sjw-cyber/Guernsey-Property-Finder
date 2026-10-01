@@ -1,7 +1,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const ids=['minPrice','maxPrice','beds','type','plot','area','parish','status','parking','south','garden','refurb','development','unknown'];
+const ids=['minPrice','maxPrice','beds','type','plot','area','parish','status','parking','south','garden','refurb','development','unknown','newToday'];
 const storage={getItem(key){try{return localStorage.getItem(key)}catch{return null}},setItem(key,value){try{localStorage.setItem(key,value);return true}catch{notify('Unable to save on this device. Check browser storage permissions.');return false}},removeItem(key){try{localStorage.removeItem(key);return true}catch{notify('Unable to delete saved data.');return false}}};
 function notify(message){$('actionStatus').textContent=message}
 function readJSON(key,fallback){try{return JSON.parse(storage.getItem(key))??fallback}catch{return fallback}}
@@ -13,8 +13,17 @@ const money=p=>p.price==null?'Price on application':'£'+p.price.toLocaleString(
 const safeUrl=url=>{try{const u=new URL(url);return u.protocol==='https:'&&['www.cooperbrouard.com','cdn.cooperbrouard.com','swoffers.co.uk','assets.reapit.net'].includes(u.hostname)?u.href:''}catch{return ''}};
 function statusLabel(p){return p.unavailable?'No longer in latest feed':p.status==='under'?'Under offer':'For sale'}
 function isNew(p){return p.date&&Date.now()-Date.parse(p.date)>=0&&Date.now()-Date.parse(p.date)<=14*86400000}
+const localListingDay=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Guernsey',year:'numeric',month:'2-digit',day:'2-digit'});
+function isNewToday(p,now=Date.now()){
+ if(typeof p.date!=='string'||!p.date.trim())return false;
+ const date=new Date(p.date);if(!Number.isFinite(date.getTime()))return false;
+ // A date without a time is the agent's calendar date, not a collection timestamp.
+ if(/^\d{4}-\d{2}-\d{2}$/.test(p.date))return date.toISOString().slice(0,10)===p.date&&localListingDay.format(date)===localListingDay.format(new Date(now));
+ return date.getTime()<=now&&localListingDay.format(date)===localListingDay.format(new Date(now));
+}
 function matches(p){
  if(p.unavailable)return false;
+ if(checked('newToday')&&!isNewToday(p))return false;
  const min=Number(val('minPrice'))||0,max=val('maxPrice')===''?Infinity:Number(val('maxPrice'));
  if(p.price==null){if((min||max!==Infinity)&&!checked('unknown'))return false}else if(p.price<min||p.price>max)return false;
  if(Number(val('beds'))>0&&(p.beds==null?!checked('unknown'):p.beds<Number(val('beds'))))return false;

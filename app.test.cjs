@@ -68,3 +68,25 @@ test('default search with unknown bedrooms disabled retains listings from both a
  t.run('saveSearch()');t.e.unknown.checked=true;t.run('loadSaved()');assert.equal(t.e.unknown.checked,false);
  assert.equal(t.e.count.textContent,`${matches.length} matching properties`);
 });
+
+test('New today uses Guernsey calendar dates, rejects missing dates and preserves saved searches',async()=>{
+ const t=await boot(),now=Date.parse('2026-10-01T11:00:00Z');
+ t.context.Date=class extends Date {static now(){return now}};
+ const today=date=>t.run(`isNewToday({date:${JSON.stringify(date)}})`);
+ assert.equal(today('2026-10-01'),true);
+ assert.equal(today('2026-09-30T23:30:00Z'),true); // 00:30 in Guernsey.
+ assert.equal(today('2026-09-30T22:30:00Z'),false);
+ assert.equal(today('2026-10-02'),false);
+ assert.equal(today('2026-10-01T13:00:00Z'),false);
+ for(const date of [null,'','invalid','2026-02-30'])assert.equal(today(date),false);
+ assert.equal(t.run(`isNewToday({date:'2026-10-25T00:30:00Z'},Date.parse('2026-10-25T12:00:00Z'))`),true);
+ assert.equal(t.run(`isNewToday({date:'2026-12-31T23:30:00Z'},Date.parse('2027-01-01T12:00:00Z'))`),false);
+ t.run('resetSearch()');t.e.newToday.checked=true;
+ const p={...t.getFeed().properties[0],price:850000,date:'2026-10-01'};
+ assert.equal(t.run(`matches(${JSON.stringify(p)})`),true);
+ assert.equal(t.run(`matches(${JSON.stringify({...p,date:'2026-09-30'})})`),false);
+ t.e.maxPrice.value='800000';assert.equal(t.run(`matches(${JSON.stringify(p)})`),false);
+ t.run('saveSearch()');t.e.newToday.checked=false;t.run('loadSaved()');assert.equal(t.e.newToday.checked,true);
+ t.run('resetSearch()');assert.equal(t.e.newToday.checked,false);
+ t.data.set('gp_saved',JSON.stringify({minPrice:'800000'}));t.run('loadSaved()');assert.equal(t.e.newToday.checked,false);
+});

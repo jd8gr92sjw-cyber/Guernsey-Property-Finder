@@ -21,6 +21,8 @@ main{max-width:1150px;margin:auto;padding:15px}.panel{background:#fff;border:1px
 <body>
 <header><h1>Guernsey Property Finder</h1><p>Private property search • your shortlist in one place</p></header>
 <main>
+<div class="checks"><label><input id="newToday" type="checkbox" onchange="runSearch()"> New today</label></div>
+<p class="hint">New today uses the agent's listing date and your current search criteria.</p>
 <button id="refreshData" class="btn secondary" onclick="refreshListings()">Refresh listings</button><p id="actionStatus" role="status" aria-live="polite"></p><p id="appStatus" class="hint" role="status" aria-live="polite"></p>
 <div class="tabs">
 <button class="tab active" onclick="setTab('search',this)">Search</button>
