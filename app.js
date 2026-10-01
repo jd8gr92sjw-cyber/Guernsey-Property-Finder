@@ -60,8 +60,8 @@ function showDetail(id){
  $('note_'+id).value=storage.getItem('note_'+id)||'';
 }
 function saveNote(id){if(storage.setItem('note_'+id,$('note_'+id).value))notify('Note saved on this device.')}
-function hideDetail(){currentDetail=null;$('detail').className='detail';$('searchPanel').style.display=currentTab==='search'?'block':'none';$('listPanel').style.display='block';runSearch()}
-function setTab(t,el){currentTab=t;currentDetail=null;$('detail').className='detail';$('listPanel').style.display=t==='saved'?'none':'block';document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));el.classList.add('active');$('searchPanel').style.display=t==='search'?'block':'none';$('savedPanel').style.display=t==='saved'?'block':'none';runSearch();updateSaved()}
+function hideDetail(){currentDetail=null;$('detail').className='detail';$('searchPanel').style.display=currentTab==='saved'?'none':'block';$('listPanel').style.display='block';runSearch()}
+function setTab(t,el){currentTab=t;currentDetail=null;$('detail').className='detail';$('listPanel').style.display=t==='saved'?'none':'block';document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));el.classList.add('active');$('searchPanel').style.display=t==='saved'?'none':'block';$('savedPanel').style.display=t==='saved'?'block':'none';runSearch();updateSaved()}
 function saveSearch(){const o={};ids.forEach(id=>o[id]=$(id).type==='checkbox'?checked(id):val(id));if(storage.setItem('gp_saved',JSON.stringify(o)))notify('Search saved on this device.')}
 function loadSaved(){const o=savedCriteria();if(!o)return;ids.forEach(id=>{if(!(id in o))return;if($(id).type==='checkbox')$(id).checked=o[id]===true;else if(['string','number'].includes(typeof o[id]))$(id).value=o[id]});setTab('search',document.querySelector('.tab'))}
 function deleteSaved(){if(storage.removeItem('gp_saved'))updateSaved()}

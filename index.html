@@ -24,11 +24,6 @@ main{max-width:1150px;margin:auto;padding:15px}.panel{background:#fff;border:1px
 <div class="checks"><label><input id="newToday" type="checkbox" onchange="runSearch()"> New today</label></div>
 <p class="hint">New today uses the agent's listing date and your current search criteria.</p>
 <button id="refreshData" class="btn secondary" onclick="refreshListings()">Refresh listings</button><p id="actionStatus" role="status" aria-live="polite"></p><p id="appStatus" class="hint" role="status" aria-live="polite"></p>
-<div class="tabs">
-<button class="tab active" onclick="setTab('search',this)">Search</button>
-<button class="tab" onclick="setTab('shortlist',this)">⭐ Shortlist</button>
-<button class="tab" onclick="setTab('saved',this)">Saved search</button>
-</div>
 
 <section id="searchPanel" class="panel">
 <div class="grid">
@@ -50,7 +45,7 @@ main{max-width:1150px;margin:auto;padding:15px}.panel{background:#fff;border:1px
 <label><input id="unknown" type="checkbox" checked> Include unknown bedrooms / type</label>
 </div>
 <p class="hint">Missing feature details stay as possible matches, marked unknown. Known features that fail your criteria are excluded.</p>
-<div class="actions"><button class="btn primary" onclick="runSearch()">Search</button><button class="btn secondary" onclick="resetSearch()">Clear</button><button class="btn secondary" onclick="saveSearch()">Save this search</button></div>
+<div class="actions"><button class="btn primary tab active" onclick="setTab('search',this)">Search</button><button class="btn secondary tab" onclick="setTab('shortlist',this)">⭐ Shortlist</button><button class="btn secondary" onclick="resetSearch()">Clear</button><button class="btn secondary" onclick="saveSearch()">Save this search</button></div>
 </section>
 
 <section id="savedPanel" class="panel" style="display:none"><b>Saved search</b><p style="color:var(--muted);font-size:13px">Your current criteria are saved locally on this device.</p><div id="savedText"></div><div class="actions"><button class="btn primary" onclick="loadSaved()">Load saved search</button><button class="btn secondary" onclick="deleteSaved()">Delete</button></div></section>
