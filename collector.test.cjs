@@ -33,6 +33,26 @@ function swoffersDetail({id=32835,status='for-sale',price='&pound;360,000',area=
  return `<body class="single-property postid-${id}"><div class="property-hero__status" data-status="${status}">Status</div><h1>Example &amp; Home</h1><div class="property-hero__price">${price}</div><span class="property-bar__details-area">${area}</span><span class="property-bar__details-bedrooms">${beds}</span><div class="property-main__overview entry-content"><p>A coastal home.</p></div><div class="property-main__locale-area">Road, ${area}</div><img src="https://assets.reapit.net/swf/live/pictures/LMA/26/photo.jpg?t=1" class="property-hero__carousel-image"><img src="https://assets.reapit.net/swf/live/pictures/LMA/26/photo.jpg?t=2" class="property-hero__carousel-image"><img src="https://evil.example/photo.jpg" class="property-hero__carousel-image">`;
 }
 const sc=()=>({...parseSwoffersIndex(swoffersIndex(),swoffersUrl).cards[0],type:'Bungalow',sourceType:'bungalow'});
+test('floor totals preserve qualifiers, convert metric units and retain evidence',()=>{
+ const {advertisedFloor}=require('./collector.cjs');
+ assert.equal(advertisedFloor('Total floor area: 1,500 sq ft').area,1500);
+ assert.equal(advertisedFloor('Internal area 100 m²').area,1076.4);
+ assert.equal(advertisedFloor('Floor area 100 square metres').areaEvidence[0].unit,'sq m');
+ assert.equal(advertisedFloor('Offering approximately 3,000sqft with planning permission to extend.').areaQualifier,'approximate');
+ assert.equal(advertisedFloor('Offers over 2,000 sq. ft. of light-filled accommodation.').areaQualifier,'lower');
+ assert.equal(advertisedFloor('The house extends to nearly 6,000 sq ft.').areaQualifier,'upper');
+ const conflict=advertisedFloor('Total floor area 1800 sqft','Total floor area 1700 sqft');assert.equal(conflict.area,1700);assert.equal(conflict.areaConflict,true);
+ const rounded=advertisedFloor('Internal floor area 100 sq m','Internal floor area 1076 sq ft');assert.equal(rounded.areaConflict,false);
+});
+test('floor extraction rejects rooms, terraces, outbuildings, proposed space and partial floors',()=>{
+ const {advertisedFloor}=require('./collector.cjs');
+ for(const s of ['Kitchen 5m x 4m.','Total terrace area 500 sqft','Floor area of garage 600 sq ft','Proposed floor area 1200 sqft','Planning permission to erect a 1,230 sq ft dwelling.','Ground floor area 1500 sqft','Floor area between 1000 and 1500 sqft','Floor area .5 sq m','Floor area -200 sq ft'])assert.equal(advertisedFloor(s).area,null,s);
+ const p=advertisedFloor('The apartment offers 3,200sqft of space, located in town. A large terrace of approximately 500 sqft.');assert.equal(p.area,3200);assert.equal(p.areaEvidence.length,1);
+});
+test('both agent parsers populate advertised floor totals without room calculations',()=>{
+ const cb=parseProperty(html({description:'Total floor area approximately 100 sq m.'}),card,'now');assert.equal(cb.area,1076.4);assert.equal(cb.areaQualifier,'approximate');
+ const sw=parseSwoffersProperty(swoffersDetail().replace('A coastal home.','Offering over 2,000 sq. ft. of accommodation.'),sc(),'now');assert.equal(sw.area,2000);assert.equal(sw.areaQualifier,'lower');
+});
 test('Swoffers parses exact facts, source type and photographs with separate stable IDs',()=>{
  const p=parseSwoffersProperty(swoffersDetail(),sc(),'now');
  assert.equal(p.id,-32835);assert.equal(p.source,'swoffers');assert.equal(p.agent,'Swoffers');assert.equal(p.price,360000);assert.equal(p.beds,1);assert.equal(p.type,'Bungalow');assert.equal(p.name,'Example & Home');assert.equal(p.description,'A coastal home.');assert.equal(p.address,'Road, Castel');assert.deepEqual(p.photos,['https://assets.reapit.net/swf/live/pictures/LMA/26/photo.jpg']);assert.equal(p.garden,null);

@@ -1,5 +1,16 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const vm=require('node:vm');const path=require('node:path');
 const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),script=fs.readFileSync(path.join(__dirname,'app.js'),'utf8');
+test('floor minimum filters collected totals, labels qualifications and escapes evidence',async()=>{
+ const t=await boot();t.run('resetSearch()');t.e.area.value='2500';t.e.unknown.checked=false;
+ const p={...t.getFeed().properties[0],area:3000,areaQualifier:'approximate',areaEvidence:[{wording:'Approximately 3000 sqft',unit:'sq ft'}]};
+ assert.equal(t.run(`matches(${JSON.stringify(p)})`),true);assert.match(t.run(`card(${JSON.stringify(p)})`),/Approx\. 3,000 sq ft/);
+ t.e.area.value='3500';assert.equal(t.run(`matches(${JSON.stringify(p)})`),false);
+ t.e.area.value='2500';const bounded={...p,areaQualifier:'upper'};assert.equal(t.run(`matches(${JSON.stringify(bounded)})`),false);
+ t.e.unknown.checked=true;assert.equal(t.run(`matches(${JSON.stringify(bounded)})`),true);assert.equal(t.run(`score(${JSON.stringify(bounded)})`),0);
+ assert.match(t.run(`card(${JSON.stringify(bounded)})`),/Size unconfirmed: floor area/);
+ t.e.area.value='3000';assert.equal(t.run(`matches(${JSON.stringify(bounded)})`),false);
+ assert.ok(!t.run(`floorEvidenceHtml(${JSON.stringify({...p,areaEvidence:[{wording:'<script>bad()</script>',unit:'sq m',originalValue:100}]})})`).includes('<script>'));
+});
 test('duplicate agents use smaller plot before filtering and preserve saved listings',async()=>{
  const t=await boot();const base={...t.getFeed().properties[0],name:'Same House',address:'Test Road',parish:'Vale',market:'Local Market',plot:2,plotQualifier:'exact'};
  const cb={...base,id:900001,source:'cooper-brouard',agent:'Cooper Brouard'},sw={...base,id:-900001,source:'swoffers',agent:'Swoffers',address:'Test Road, Vale',plot:1,url:'https://swoffers.co.uk/property/test'};

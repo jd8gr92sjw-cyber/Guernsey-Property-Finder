@@ -82,7 +82,17 @@ turning it off requires stated sizes. Known measurements below a minimum are
 always excluded, including upper bounds that rule out the minimum. Search counts
 show how many results have unconfirmed sizes. Approximate sizes are compared at their
 advertised value and visibly labelled; check the original agent listing before
-relying on a threshold. Floor-area collection remains a separate future step.
+relying on a threshold.
+
+Floor areas are collected from explicit dwelling totals in descriptions and key
+features. Square metres are converted using 1 sq m = 10.76391041671 sq ft, with
+the original value, unit and wording retained in details. Approximate and bounded
+totals keep their qualifications; upper bounds that cannot confirm a minimum
+remain labelled possibilities only when unknown data is included. Conflicting
+totals use the smaller figure. Room dimensions are not summed, and terrace,
+garage, shed, proposed extension and individual-floor areas are excluded.
+PDF brochures and floorplan images are not yet extracted, so many areas remain
+unknown. No new collection dependencies or requests have been added.
 
 Node.js 24; no npm packages required.
 

@@ -54,6 +54,35 @@ function advertisedPlot(...sources){
   const chosen=evidence.filter(e=>e.value===smallest).sort((a,b)=>priority[a.qualifier]-priority[b.qualifier])[0];
   return {plot:chosen.value,plotQualifier:chosen.qualifier,plotModifier:chosen.modifier,plotConflict:distinct.size>1,plotEvidence:evidence};
 }
+function advertisedFloor(...sources){
+ const evidence=[];
+ const pattern=/\b(?:(approximately|approx\.?|around|about|circa|nearly|almost|in excess of|more than|less than|at least|at most|over|under|up to)\s+)?(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)\s*(sq\.?\s*ft\.?|sq\.?\s*feet|square\s+feet|ft[²2]|sq\.?\s*m(?:et(?:re|er)s?)?\.?|square\s+met(?:re|er)s|m[²2])(?!\w)/gi;
+ for(const source of sources){
+  const description=text(source);
+  for(const m of description.matchAll(pattern)){
+   const before=description.slice(Math.max(0,m.index-100),m.index),after=description.slice(m.index+m[0].length,m.index+m[0].length+75);
+   const clauseBefore=before.split(/[.!?;]/).at(-1).slice(-65);
+   const clauseAfter=after.split(/\bwith\b|[,;.!?]/i)[0].slice(0,40);
+   const local=clauseBefore+m[0]+clauseAfter;
+   if(!/(?:floor\s*(?:area|space)|internal\s*area|total\s*area|accommodation|(?:house|home|apartment|property)\s+(?:offers?|provides?|extends?)|offering|extending|set over)/i.test(before)&&!/^\s*(?:of\s+(?:(?:[a-z-]+\s+){0,2}accommodation|(?:living\s+)?space)|in total)/i.test(after))continue;
+   if(/\b(?:terraces?|balcon(?:y|ies)|gardens?|plots?|sites?|sheds?|garages?|stores?|outbuildings?|proposed|planning permission|to erect|extension)\b/i.test(local)||/\b(?:ground|first|second)\s+floor\s+(?:area|space)\s*(?:of|is|:)?\s*$/i.test(clauseBefore))continue;
+   const range=/(?:\d\s*(?:[-–—/]|to|and)|between\s+[^.!?]{0,30}|[.,−-])\s*$/i.test(before);
+   if(range)continue;
+   const originalValue=Number(m[2].replaceAll(',',''));if(!Number.isFinite(originalValue)||originalValue<=0)continue;
+   const unit=/feet|ft/i.test(m[3])?'sq ft':'sq m';
+   const value=unit==='sq m'?Math.round(originalValue*10.76391041671*10)/10:originalValue;
+   const modifier=(m[1]||'').toLowerCase();
+   const qualifier=/under|less than|up to|at most|nearly|almost/.test(modifier)?'upper':/over|more than|in excess|at least/.test(modifier)?'lower':modifier?'approximate':'exact';
+   if(!evidence.some(e=>e.value===value&&e.qualifier===qualifier))evidence.push({value,originalValue,unit,qualifier,modifier,wording:(before+m[0]+after).trim()});
+  }
+ }
+ if(!evidence.length)return {area:null};
+ // Metric/imperial figures may differ slightly through advertised rounding.
+ const smallest=Math.min(...evidence.map(e=>e.value));
+ const priority={upper:0,approximate:1,exact:2,lower:3};
+ const chosen=evidence.filter(e=>e.value===smallest).sort((a,b)=>priority[a.qualifier]-priority[b.qualifier])[0];
+ return {area:chosen.value,areaQualifier:chosen.qualifier,areaModifier:chosen.modifier,areaConflict:evidence.some(e=>Math.abs(e.value-smallest)>Math.max(1,smallest*.01)),areaEvidence:evidence};
+}
 async function request(url) {
   if(![ORIGIN,SWOFFERS].includes(new URL(url).origin))throw Error('Unexpected collection origin');
   for(let attempt=0;attempt<3;attempt++){
@@ -117,7 +146,7 @@ function parseProperty(html, card, now) {
   // Some current source listings omit their description; retain them explicitly empty.
   const photos=[...new Set([].concat(residence.image||[]).filter(u=>typeof u==='string'&&/^https:\/\/(cdn\.)?cooperbrouard\.com\//.test(u)))];
   const features=html.match(/<div class="cb-single-property-key-features">([\s\S]*?)<\/ul>/)?.[1]||'';
-  return {id:Number(card.url.match(/property\/(\d+)/)[1]),source:'cooper-brouard',name:text(residence.name),agent:'Cooper Brouard',market:card.market,price,priceLabel:price===null?'Price on application':priceLabel,beds:Number.isFinite(Number(residence.numberOfBedrooms))&&residence.numberOfBedrooms!=null?Number(residence.numberOfBedrooms):null,type,sourceType:rawType,sourceTypes,parish,location,address:text(residence.address?.streetAddress),description,url:card.url,photos,status,date:listing.datePosted||listing.datePublished||null,lastSeen:now,...advertisedPlot(description,features),area:null,parking:null,south:null,garden:null,refurb:null,development:null};
+  return {id:Number(card.url.match(/property\/(\d+)/)[1]),source:'cooper-brouard',name:text(residence.name),agent:'Cooper Brouard',market:card.market,price,priceLabel:price===null?'Price on application':priceLabel,beds:Number.isFinite(Number(residence.numberOfBedrooms))&&residence.numberOfBedrooms!=null?Number(residence.numberOfBedrooms):null,type,sourceType:rawType,sourceTypes,parish,location,address:text(residence.address?.streetAddress),description,url:card.url,photos,status,date:listing.datePosted||listing.datePublished||null,lastSeen:now,...advertisedPlot(description,features),...advertisedFloor(description,features),parking:null,south:null,garden:null,refurb:null,development:null};
 }
 let running=null;
 function collect(){if(running)return running;running=run().finally(()=>running=null);return running}
@@ -191,7 +220,7 @@ function parseSwoffersProperty(html,card,now){
   const address=text(swoffersField(html,'property-main__locale-area'));
   // Negative IDs reserve a separate namespace without changing existing CB IDs or notes.
   const features=text(html.match(/<meta property="og:description" content="([^"]*)"/)?.[1]);
-  return {id:-sourceId,source:'swoffers',name,agent:'Swoffers',market:card.market,price,priceLabel,beds,type:card.type||null,sourceType:card.sourceType||null,parish,location,address,description,url:card.url,photos,status,date:page?.datePublished||null,lastSeen:now,...advertisedPlot(description,features),area:null,parking:null,south:null,garden:null,refurb:null,development:null};
+  return {id:-sourceId,source:'swoffers',name,agent:'Swoffers',market:card.market,price,priceLabel,beds,type:card.type||null,sourceType:card.sourceType||null,parish,location,address,description,url:card.url,photos,status,date:page?.datePublished||null,lastSeen:now,...advertisedPlot(description,features),...advertisedFloor(description,features),parking:null,south:null,garden:null,refurb:null,development:null};
 }
 async function collectSwoffers(started){
   const robots=await request(SWOFFERS+'/robots.txt');
@@ -233,7 +262,7 @@ async function run(){
   await fs.writeFile(DATA+'.tmp',JSON.stringify(data,null,2)+'\n');await fs.rename(DATA+'.tmp',DATA);
   console.log(`Published ${properties.length} current residential listings`);return data;
 }
-module.exports={collect,parseIndex,parseProperty,robotsAllows,text,askingPrice,advertisedPlot,parseSwoffersIndex,parseSwoffersProperty,collectSwoffers,collectCooperBrouard};
+module.exports={collect,parseIndex,parseProperty,robotsAllows,text,askingPrice,advertisedPlot,advertisedFloor,parseSwoffersIndex,parseSwoffersProperty,collectSwoffers,collectCooperBrouard};
 if(require.main===module)collect().catch(error=>{console.error(error.message);process.exitCode=1});
 
 
