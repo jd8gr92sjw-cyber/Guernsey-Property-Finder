@@ -76,7 +76,11 @@ dimensions, or convert unsupported land units.
 Conflicting figures use the smaller stated amount and are flagged in the app.
 When amounts are equal, the stricter qualification is retained. Ranges and
 partial land measurements remain unconfirmed. An upper bound such as "under half
-an acre" cannot establish a minimum. Approximate sizes are compared at their
+an acre" cannot establish a minimum. The Include unknown data checkbox lets
+missing or insufficient size evidence remain as clearly labelled possibilities;
+turning it off requires stated sizes. Known measurements below a minimum are
+always excluded, including upper bounds that rule out the minimum. Search counts
+show how many results have unconfirmed sizes. Approximate sizes are compared at their
 advertised value and visibly labelled; check the original agent listing before
 relying on a threshold. Floor-area collection remains a separate future step.
 

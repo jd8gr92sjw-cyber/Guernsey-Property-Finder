@@ -27,16 +27,25 @@ function isNewToday(p,now=Date.now()){
  if(/^\d{4}-\d{2}-\d{2}$/.test(p.date))return date.toISOString().slice(0,10)===p.date&&localListingDay.format(date)===localListingDay.format(new Date(now));
  return date.getTime()<=now&&localListingDay.format(date)===localListingDay.format(new Date(now));
 }
+function sizeState(p,k){
+ const minimum=Number(val(k));if(!(minimum>0))return 'pass';
+ if(p[k]==null)return 'unknown';
+ if(p[k]<minimum)return 'fail';
+ if(k==='plot'&&p.plotQualifier==='upper'){
+  if(p.plot===minimum&&!/^(up to|at most)$/.test(p.plotModifier||''))return 'fail';
+  return 'unknown';
+ }
+ return 'pass';
+}
+function unconfirmedSizes(p){return ['plot','area'].filter(k=>sizeState(p,k)==='unknown').map(k=>k==='plot'?'plot':'floor area')}
+function sizeNotice(p){const sizes=unconfirmedSizes(p);return currentTab==='search'&&sizes.length?`<p class="source-note">Size unconfirmed: ${sizes.join(' and ')} minimum not verified.</p>`:''}
 function matches(p){
  if(p.unavailable)return false;
  if(checked('newToday')&&!isNewToday(p))return false;
  const min=Number(val('minPrice'))||0,max=val('maxPrice')===''?Infinity:Number(val('maxPrice'));
  if(p.price==null){if((min||max!==Infinity)&&!checked('unknown'))return false}else if(p.price<min||p.price>max)return false;
  if(Number(val('beds'))>0&&(p.beds==null?!checked('unknown'):p.beds<Number(val('beds'))))return false;
- // Entered size minimums require a confirmed measurement; missing sizes cannot pass.
- for(const k of ['plot','area'])if(Number(val(k))>0&&(p[k]==null||p[k]<Number(val(k))))return false;
- // An upper limit alone cannot establish that a selected minimum is met.
- if(Number(val('plot'))>0&&p.plotQualifier==='upper')return false;
+ for(const k of ['plot','area']){const state=sizeState(p,k);if(state==='fail'||state==='unknown'&&!checked('unknown'))return false;}
  if(val('type')&&(p.type==null?!checked('unknown'):p.type!==val('type')))return false;
  if(val('parish')&&p.parish!==val('parish'))return false;
  if(checked('parking')&&p.parking!=null&&p.parking<3)return false;
@@ -49,7 +58,7 @@ function score(p){const tests=[];for(const k of ['beds','plot','area'])if(+val(k
 function card(p){
  const saved=shortlist.includes(p.id),sc=score(p),photo=safeUrl(p.photos?.[0]);
  const badge=(label,v)=>`<span class="badge ${v==null?'unknown':v?'yes':''}">${v==null?'?':v?'✓':'✕'} ${label}</span>`;
- return `<article class="card"><div class="photo">${photo?`<img src="${esc(photo)}" alt="${esc(p.name)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentElement.textContent='Photo unavailable'">`:'No photograph supplied'}</div><div class="body"><div class="top"><div class="price">${money(p)}</div><div class="tag">${esc(p.agent)}</div></div><div class="name">${esc(p.name)}</div><div class="meta">${esc(p.type||'Type unknown')} · ${esc(p.location)} · ${esc(p.market)}</div><p class="source-note">${statusLabel(p)}${isNew(p)?' · Listed within 14 days':''}</p><div class="facts">${p.beds??'Unknown'} beds · ${esc(plotLabel(p))} · ${p.area==null?'Floor area unknown':esc(p.area)+' sq ft'}</div><div class="badges">${badge('3+ parking',p.parking==null?null:p.parking>=3)}${badge('South/sunny',p.south)}${badge('Outside space',p.garden)}${badge('Refurb potential',p.refurb)}</div><div class="footer"><span class="match">${sc==null?'No feature preferences':sc+'% confirmed feature match'}</span><div class="actions2"><button class="icon" aria-label="${saved?'Remove from':'Add to'} shortlist: ${esc(p.name)}" aria-pressed="${saved}" onclick="toggleShort(${p.id})">${saved?'⭐':'☆'}</button><button class="icon" onclick="showDetail(${p.id})">Details</button></div></div></div></article>`;
+ return `<article class="card"><div class="photo">${photo?`<img src="${esc(photo)}" alt="${esc(p.name)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentElement.textContent='Photo unavailable'">`:'No photograph supplied'}</div><div class="body"><div class="top"><div class="price">${money(p)}</div><div class="tag">${esc(p.agent)}</div></div><div class="name">${esc(p.name)}</div><div class="meta">${esc(p.type||'Type unknown')} · ${esc(p.location)} · ${esc(p.market)}</div><p class="source-note">${statusLabel(p)}${isNew(p)?' · Listed within 14 days':''}</p><div class="facts">${p.beds??'Unknown'} beds · ${esc(plotLabel(p))} · ${p.area==null?'Floor area unknown':esc(p.area)+' sq ft'}</div>${sizeNotice(p)}<div class="badges">${badge('3+ parking',p.parking==null?null:p.parking>=3)}${badge('South/sunny',p.south)}${badge('Outside space',p.garden)}${badge('Refurb potential',p.refurb)}</div><div class="footer"><span class="match">${sc==null?'No feature preferences':sc+'% confirmed feature match'}</span><div class="actions2"><button class="icon" aria-label="${saved?'Remove from':'Add to'} shortlist: ${esc(p.name)}" aria-pressed="${saved}" onclick="toggleShort(${p.id})">${saved?'⭐':'☆'}</button><button class="icon" onclick="showDetail(${p.id})">Details</button></div></div></div></article>`;
 }
 function allProperties(){const saved=readJSON('gp_property_snapshots',{});const snapshots=saved&&typeof saved==='object'&&!Array.isArray(saved)?Object.values(saved):[];return [...properties,...snapshots.filter(p=>p&&Number.isInteger(p.id)&&shortlist.includes(p.id)&&!properties.some(q=>q.id===p.id)).map(p=>({...p,unavailable:true}))]}
 function searchProperties(){
@@ -72,7 +81,8 @@ function duplicateEvidenceHtml(p){return p.duplicateListings?`<h3>Also advertise
 function runSearch(){
  const r=currentTab==='shortlist'?allProperties().filter(p=>shortlist.includes(p.id)):searchProperties().filter(matches);
  r.sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(a.price??Infinity)-(b.price??Infinity));
- $('count').textContent=`${r.length} matching ${r.length===1?'property':'properties'}`;
+ const uncertain=currentTab==='search'?r.filter(p=>unconfirmedSizes(p).length).length:0;
+ $('count').textContent=`${r.length} matching ${r.length===1?'property':'properties'}${uncertain?' · '+uncertain+' with size unconfirmed':''}`;
  $('results').innerHTML=r.length?r.map(card).join(''):`<div class="empty">${loading?'Loading listings…':currentTab==='shortlist'?'Your shortlist is empty.':!properties.length?'No listing data is available. Connect to the internet and refresh.':'No properties match. Try widening your search or leaving size minimums blank.'}</div>`;
 }
 function remember(p){let saved=readJSON('gp_property_snapshots',{});if(!saved||typeof saved!=='object'||Array.isArray(saved))saved={};saved[p.id]=p;storage.setItem('gp_property_snapshots',JSON.stringify(saved))}
@@ -81,7 +91,7 @@ function showDetail(id){
  const p=(currentTab==='search'?searchProperties():allProperties()).find(p=>p.id===id)||allProperties().find(p=>p.id===id);if(!p)return;currentDetail=id;remember(p);
  $('listPanel').style.display='none';$('searchPanel').style.display='none';$('detail').className='detail show';
  const photos=(p.photos||[]).map(safeUrl).filter(Boolean);
- $('detail').innerHTML=`<button class="btn secondary back" onclick="hideDetail()">← Back to results</button><div class="panel"><div class="gallery">${photos.length?photos.map((url,i)=>`<img src="${esc(url)}" alt="${esc(p.name)} — photo ${i+1}" loading="lazy" referrerpolicy="no-referrer" onerror="this.alt='Photo unavailable';this.style.display='none'">`).join(''):'No photographs supplied'}</div><h2>${esc(p.name)}</h2><div class="price">${money(p)}</div><p>${statusLabel(p)} · ${esc(p.market)}</p><p class="meta">${esc(p.type||'Type unknown')} · ${esc(p.address)} · ${esc(p.location)} · ${esc(p.agent)}</p><div class="two"><div><h3>Key facts</h3><ul><li>Bedrooms: ${p.beds??'Unknown'}</li><li>Plot: ${esc(plotLabel(p))}</li><li>Floor area: ${p.area==null?'Unknown':esc(p.area)+' sq ft'}</li><li>Parking spaces: ${p.parking??'Unknown'}</li></ul></div><div><h3>Things to investigate</h3><ul><li>Aspect: ${p.south==null?'Unknown':p.south?'South / sunny':'Other'}</li><li>Refurbishment potential: ${p.refurb==null?'Unknown':p.refurb?'Flagged':'Not flagged'}</li><li>Development potential: ${p.development==null?'Unknown':p.development?'Flagged':'Not flagged'}</li></ul></div></div>${duplicateEvidenceHtml(p)}${plotEvidenceHtml(p)}<h3>Agent description</h3><p class="description">${esc(p.description||'No description supplied.')}</p><p class="source-note">Source: ${esc(p.agent)}. Last collected ${esc(new Date(p.lastSeen).toLocaleString())}. Photographs require a connection and may be unavailable offline. Missing facts have not been inferred from photographs or marketing text.</p><h3><label for="note_${p.id}">Your notes</label></h3><textarea id="note_${p.id}" placeholder="Add your own notes..."></textarea><div class="actions"><button class="btn primary" onclick="saveNote(${p.id})">Save note</button>${safeUrl(p.url)?`<a class="btn secondary" href="${esc(safeUrl(p.url))}" target="_blank" rel="noopener noreferrer">Open original listing ↗</a>`:''}</div></div>`;
+ $('detail').innerHTML=`<button class="btn secondary back" onclick="hideDetail()">← Back to results</button><div class="panel"><div class="gallery">${photos.length?photos.map((url,i)=>`<img src="${esc(url)}" alt="${esc(p.name)} — photo ${i+1}" loading="lazy" referrerpolicy="no-referrer" onerror="this.alt='Photo unavailable';this.style.display='none'">`).join(''):'No photographs supplied'}</div><h2>${esc(p.name)}</h2><div class="price">${money(p)}</div><p>${statusLabel(p)} · ${esc(p.market)}</p><p class="meta">${esc(p.type||'Type unknown')} · ${esc(p.address)} · ${esc(p.location)} · ${esc(p.agent)}</p><div class="two"><div><h3>Key facts</h3><ul><li>Bedrooms: ${p.beds??'Unknown'}</li><li>Plot: ${esc(plotLabel(p))}</li><li>Floor area: ${p.area==null?'Unknown':esc(p.area)+' sq ft'}</li><li>Parking spaces: ${p.parking??'Unknown'}</li></ul></div><div><h3>Things to investigate</h3><ul><li>Aspect: ${p.south==null?'Unknown':p.south?'South / sunny':'Other'}</li><li>Refurbishment potential: ${p.refurb==null?'Unknown':p.refurb?'Flagged':'Not flagged'}</li><li>Development potential: ${p.development==null?'Unknown':p.development?'Flagged':'Not flagged'}</li></ul></div></div>${sizeNotice(p)}${duplicateEvidenceHtml(p)}${plotEvidenceHtml(p)}<h3>Agent description</h3><p class="description">${esc(p.description||'No description supplied.')}</p><p class="source-note">Source: ${esc(p.agent)}. Last collected ${esc(new Date(p.lastSeen).toLocaleString())}. Photographs require a connection and may be unavailable offline. Missing facts have not been inferred from photographs or marketing text.</p><h3><label for="note_${p.id}">Your notes</label></h3><textarea id="note_${p.id}" placeholder="Add your own notes..."></textarea><div class="actions"><button class="btn primary" onclick="saveNote(${p.id})">Save note</button>${safeUrl(p.url)?`<a class="btn secondary" href="${esc(safeUrl(p.url))}" target="_blank" rel="noopener noreferrer">Open original listing ↗</a>`:''}</div></div>`;
  $('note_'+id).value=storage.getItem('note_'+id)||'';
 }
 function saveNote(id){if(storage.setItem('note_'+id,$('note_'+id).value))notify('Note saved on this device.')}

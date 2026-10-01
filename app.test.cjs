@@ -104,7 +104,7 @@ test('New today uses Guernsey calendar dates, rejects missing dates and preserve
  t.data.set('gp_saved',JSON.stringify({minPrice:'800000'}));t.run('loadSaved()');assert.equal(t.e.newToday.checked,false);
 });
 
-test('50 acres and 50000 sq ft exclude unknown and undersized listings in either unknown mode',async()=>{
+test('size minima exclude undersized listings and include unknowns only when enabled',async()=>{
  const t=await boot();t.run('resetSearch()');
  const p={...t.getFeed().properties[0],plot:50,area:50000};
  t.e.plot.value='50';t.e.area.value='50000';
@@ -113,8 +113,8 @@ test('50 acres and 50000 sq ft exclude unknown and undersized listings in either
   t.e.unknown.checked=unknown;
   assert.equal(matches(p),true);
   for(const k of ['plot','area']){
-   assert.equal(matches({...p,[k]:null}),false);
-   const missing={...p};delete missing[k];assert.equal(matches(missing),false);
+   assert.equal(matches({...p,[k]:null}),unknown);
+   const missing={...p};delete missing[k];assert.equal(matches(missing),unknown);
    assert.equal(matches({...p,[k]:p[k]-1}),false);
   }
  }
@@ -126,7 +126,7 @@ test('50 acres and 50000 sq ft exclude unknown and undersized listings in either
 });
 
 test('plot bounds and approximation remain visible and cannot create false minimum matches',async()=>{
- const t=await boot();t.run('resetSearch()');t.e.plot.value='.5';
+ const t=await boot();t.run('resetSearch()');t.e.unknown.checked=false;t.e.plot.value='.5';
  const base={...t.getFeed().properties[0],plot:.5,plotEvidence:[{wording:'A plot of around half an acre.'}]};
  for(const qualifier of ['exact','approximate','lower'])assert.equal(t.run(`matches(${JSON.stringify({...base,plotQualifier:qualifier})})`),true);
  assert.equal(t.run(`matches(${JSON.stringify({...base,plotQualifier:'upper'})})`),false);
@@ -136,4 +136,21 @@ test('plot bounds and approximation remain visible and cannot create false minim
  assert.match(t.run(`card(${JSON.stringify({...base,plotQualifier:'upper'})})`),/Under 0\.5 acres/);
  assert.match(t.run(`card(${JSON.stringify({...base,plot:null})})`),/Plot total unconfirmed/);
  assert.ok(!t.run(`plotEvidenceHtml(${JSON.stringify({...base,plotEvidence:[{wording:'<script>bad()</script>'}]})})`).includes('<script>'));
+});
+
+test('small size minima retain possibilities, label missing sizes and save the unknown setting',async()=>{
+ const t=await boot();const base={...t.getFeed().properties[0],plot:null,area:null,price:850000};
+ t.setFeed({...t.getFeed(),properties:[base]});await t.context.loadListings();t.run('resetSearch()');t.e.plot.value='.1';t.e.area.value='10';t.run('runSearch()');
+ assert.equal(t.e.count.textContent,'1 matching property · 1 with size unconfirmed');
+ assert.match(t.e.results.innerHTML,/Size unconfirmed: plot and floor area minimum not verified/);
+ assert.equal(t.run(`score(${JSON.stringify(base)})`),0);
+ t.run('saveSearch()');t.e.unknown.checked=false;t.run('runSearch()');assert.equal(t.e.count.textContent,'0 matching properties');
+ t.run('loadSaved()');assert.equal(t.e.unknown.checked,true);assert.match(t.e.count.textContent,/1 matching property/);
+ const bounded={...base,plot:.5,plotQualifier:'upper'};
+ assert.equal(t.run(`matches(${JSON.stringify(bounded)})`),true);
+ assert.match(t.run(`card(${JSON.stringify(bounded)})`),/Size unconfirmed: plot and floor area/);
+ t.e.plot.value='.5';assert.equal(t.run(`matches(${JSON.stringify(bounded)})`),false);
+ t.e.plot.value='.6';assert.equal(t.run(`matches(${JSON.stringify(bounded)})`),false);
+ t.e.plot.value='.1';t.e.unknown.checked=false;assert.equal(t.run(`matches(${JSON.stringify({...base,plot:.5,area:100})})`),true);
+ assert.equal(t.run(`matches(${JSON.stringify({...base,plot:.05,area:100})})`),false);
 });
