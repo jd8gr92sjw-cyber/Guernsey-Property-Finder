@@ -7,11 +7,11 @@ hosting and GitHub Actions. The app and collector run independently of the
 original computer. The original working local app is preserved separately.
 
 ## Collection and hosting
-- Cooper Brouard, Swoffers and Cherry Godfrey residential sales, including Local and Open Market properties.
+- Cooper Brouard, Swoffers, Cherry Godfrey and Savills residential sales, including Local and Open Market properties.
 - Only positive numerical asking prices are collected. POA, Price on Application,
   Price on Request and missing-price listings are excluded from all agents.
 - Swoffers pagination totals and source type filters are checked before publication.
-  All three agents must finish successfully before the combined feed replaces the previous one.
+  All four agents must finish successfully before the combined feed replaces the previous one.
 - Scheduled collection at 02:23, 08:23, 14:23 and 20:23 UTC every day.
   GitHub may delay scheduled jobs; the app shows the actual collection time.
 - Pushes to main and manual workflow runs also collect, test and deploy.
@@ -44,6 +44,10 @@ bedroom, price and advertised size data. Missing parish and sizes remain unknown
 Cherry Godfrey IDs use a reserved negative range; existing IDs are unchanged.
 Original links use the website's public detail routes, and Expert Agent photos
 use HTTPS. The existing layout and collection schedule are unchanged.
+
+## Savills integration
+
+The public Guernsey residential sale search is collected across all advertised pages. Declared totals, unique source identities, sale scope and pagination are checked before the combined feed is replaced. Sold, rental, commercial, confidential, building-plot and unpriced/POA listings are excluded. Local and Open Market homes, including under offer, use the existing schema and filters. Savills IDs occupy a separate reserved negative range, preserving existing notes and shortlists. Photos and original links use only Savills HTTPS hosts. Published floor totals retain Savills Guernsey's approximate qualification; absent facts and listing dates remain unknown. The layout, schedule and deployment workflow are unchanged.
 
 ## Original deployment validation
 The first cloud workflow successfully collected 114 properties, passed the 12

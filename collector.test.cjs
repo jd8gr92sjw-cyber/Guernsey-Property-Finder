@@ -5,6 +5,34 @@ const path=require('node:path');
 const {parseProperty,parseIndex,robotsAllows,collect,askingPrice,parseSwoffersIndex,parseSwoffersProperty,collectSwoffers}=require('./collector.cjs');
 const {parseCherryProperty,parseCherryFeed}=require('./collector.cjs');
 const cherry={_id:'ea-s335',slug:{current:'ea-s335'},listingType:'buy',department:'Local Market Sales',market:{title:'Local Market'},status:{title:'On Market'},propertyType:{title:'Local Market House'},publicPrice:'£545,000',price:545000,bedrooms:3,title:'Mirabelle, St Peter Port',parish:{title:'St Peter Port'},publishedAt:'2023-05-15T09:14:00.000Z',description:'A house set in a plot of half an acre. Total floor area 1200 sq ft.',featuredImage:{asset:{url:'http://med05.expertagent.co.uk/photo.jpg'}},highlights:['Garden']};
+const {parseSavillsIndex,parseSavillsProperty,collectSavills}=require('./collector.cjs');
+const savills={ID:1191499,PropertyID:1191499,ExternalPropertyID:'GBGUESGUE250055',MetaInformation:{CanonicalUrl:'property-detail/gbguesgue250055'},TenureType:'GRS_T_B',PropertyTypes:[{Type:'bungalow'}],MarketTypes:[{Caption:'Local Market'}],ShowPrice:true,DisplayCurrency:'GBP',DisplayPriceText:'£565,000',GuidePriceText:'Guide price',Price:565000,AddressLine1:'Heavenly',AddressLine2:'Rue De Houmet, Vale, GY6 8JH',Bedrooms:2,PropertyStatusFlag:10,PropertyStatusFlagTranslation:'New',HeaderSizeFormatted:['775 sq ft','72 sq m'],Description:'A home set in grounds of half an acre.',WebFeatureList:[],PropertyCardImagesGallery:[{ImageUrl_L:'https://assets.savills.com/properties/photo.jpg'},{ImageUrl_L:'https://assets.savills.com.evil.test/photo.jpg'}]};
+const savillsUrl='https://search.savills.com/gg/en/list/property-for-sale/channel-islands/guernsey';
+function savillsPage({count=1,current=1,total=1,next=null,records=[savills],criteria={Category:'GRS_CAT_RES',Tenure:'GRS_T_B',Currency:'GBP',LocationKey:'channelislandsguernsey'}}={}){
+ const ids=records.map(p=>p.ExternalPropertyID);return '<script id="__NEXT_DATA__" type="application/json">'+JSON.stringify({props:{initialReduxState:{properties:Object.fromEntries(records.map(p=>[p.ExternalPropertyID,p])),listPage:{currentPage:current,searchedCriteria:criteria,pageMap:{[current]:{paging:{current,total,totalItems:count},results:{Properties:ids},metaData:{NextUrl:next}}}}}}})+'</script>';
+}
+test('Savills normalizes stable IDs, market, parish, status, approximate sizes and safe photos',()=>{
+ const p=parseSavillsProperty(savills,'now');assert.equal(p.id,-2001191499);assert.equal(p.type,'Bungalow');assert.equal(p.price,565000);assert.equal(p.parish,'Vale');assert.equal(p.plot,.5);assert.equal(p.area,775);assert.equal(p.areaQualifier,'approximate');assert.equal(p.date,null);assert.equal(p.garden,null);assert.deepEqual(p.photos,['https://assets.savills.com/properties/photo.jpg']);
+ const under=parseSavillsProperty({...savills,PropertyStatusFlag:1,PropertyStatusFlagTranslation:'Under offer',MarketTypes:[{Caption:'Open Market'}],AddressLine2:'Road, St Pierre Du Bois, GY7 9DP'},'now');assert.equal(under.status,'under');assert.equal(under.market,'Open Market');assert.equal(under.parish,"St Peter's");
+ assert.equal(parseSavillsProperty({...savills,PropertyStatusFlag:0,PropertyStatusFlagTranslation:null,HeaderSizeFormatted:[],AddressLine2:'Guernsey, GY1 2TD'},'now').parish,null);
+ assert.equal(parseSavillsProperty({...savills,AddressLine2:'Fermain Road, St Peter Port, Guernsey, GY1 2TD'},'now').parish,'St Peter Port');
+ assert.throws(()=>parseSavillsProperty({...savills,PropertyStatusFlagTranslation:'Unknown'},'now'),/Unknown Savills/);
+});
+test('Savills excludes POA despite hidden prices, rentals, sold homes and proposed building plots',()=>{
+ for(const changed of [{DisplayPriceText:'POA'},{GuidePriceText:'Price on application'},{DisplayPriceText:null},{ShowPrice:false},{Price:0,DisplayPriceText:'£0'},{IsSold:true},{IsLet:true},{IsCommercial:true},{IsConfidential:true},{TenureType:'GRS_T_L'},{PropertyTypes:[{Type:'house'},{Type:'building-plot'}]},{AddressLine2:'Road, Alderney, GY9 3AA'}])assert.equal(parseSavillsProperty({...savills,...changed},'now'),null);
+ assert.throws(()=>parseSavillsProperty({...savills,Price:1},'now'),/disagree/);
+});
+test('Savills rejects incomplete, repeated and changed pagination and incorrect search scope',async()=>{
+ assert.equal(parseSavillsIndex(savillsPage(),savillsUrl).expected,1);
+ assert.throws(()=>parseSavillsIndex('<h1>Unavailable</h1>',savillsUrl),/Missing/);
+ assert.throws(()=>parseSavillsIndex(savillsPage({criteria:{Category:'GRS_CAT_COM'}}),savillsUrl),/scope/);
+ assert.throws(()=>parseSavillsIndex(savillsPage({total:2,next:'https://evil.test/'}),savillsUrl),/pagination/);
+ const original=global.fetch;
+ try{for(const mode of ['incomplete','repeated','changed']){
+  let page=0;global.fetch=async url=>({ok:true,text:async()=>url.endsWith('robots.txt')?'User-agent: *\nAllow: /':(++page===1?savillsPage({count:2,total:mode==='incomplete'?1:2,next:mode==='incomplete'?null:'/gg/en/list/property-for-sale/channel-islands/guernsey/page/2'}):savillsPage({count:mode==='changed'?3:2,current:2,total:2}))});
+  await assert.rejects(collectSavills('now'),/coverage mismatch|count changed/);
+ }}finally{global.fetch=original}
+});
 test('Cherry Godfrey maps public sales, statuses, market, sizes and secure photos',()=>{
  const p=parseCherryProperty(cherry,'now');assert.equal(p.id,-1000000670);assert.equal(p.price,545000);assert.equal(p.plot,.5);assert.equal(p.area,1200);assert.equal(p.garden,null);assert.equal(p.url,'https://www.cherrygodfreyproperty.com/buy/property/ea-s335');assert.deepEqual(p.photos,['https://med05.expertagent.co.uk/photo.jpg']);
  assert.equal(parseCherryProperty({...cherry,status:{title:'Under offer with Cherry Godfrey Property'},parish:null},'now').status,'under');assert.equal(parseCherryProperty({...cherry,parish:null},'now').parish,null);

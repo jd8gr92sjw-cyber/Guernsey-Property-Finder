@@ -4,6 +4,8 @@ const {setTimeout: delay} = require('node:timers/promises');
 const ORIGIN = 'https://www.cooperbrouard.com';
 const SWOFFERS = 'https://swoffers.co.uk';
 const CHERRY = 'https://www.cherrygodfreyproperty.com';
+const SAVILLS = 'https://search.savills.com';
+const SAVILLS_SEARCH = '/gg/en/list/property-for-sale/channel-islands/guernsey';
 const DATA = path.join(__dirname, 'properties.json');
 const UA = 'GuernseyPropertyFinder/1.0 (private property search; low-frequency collector)';
 // Only explicitly advertised positive GBP asking prices qualify. A hidden
@@ -85,7 +87,7 @@ function advertisedFloor(...sources){
  return {area:chosen.value,areaQualifier:chosen.qualifier,areaModifier:chosen.modifier,areaConflict:evidence.some(e=>Math.abs(e.value-smallest)>Math.max(1,smallest*.01)),areaEvidence:evidence};
 }
 async function request(url) {
-  if(![ORIGIN,SWOFFERS,CHERRY].includes(new URL(url).origin))throw Error('Unexpected collection origin');
+  if(![ORIGIN,SWOFFERS,CHERRY,SAVILLS].includes(new URL(url).origin))throw Error('Unexpected collection origin');
   for(let attempt=0;attempt<3;attempt++){
     try{
       const r=await fetch(url,{headers:{'User-Agent':UA},signal:AbortSignal.timeout(30000)});
@@ -295,18 +297,79 @@ async function collectCherry(started){
   await delay(500);
   return parseCherryFeed(JSON.parse(await request(url)),started);
 }
+function parseSavillsIndex(html,pageUrl){
+  const match=html.match(/<script[^>]*id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+  if(!match)throw Error('Missing Savills search data');
+  const state=JSON.parse(match[1]).props?.initialReduxState;
+  const list=state?.listPage,page=list?.pageMap?.[list.currentPage],paging=page?.paging,criteria=list?.searchedCriteria;
+  if(list?.error||criteria?.Category!=='GRS_CAT_RES'||criteria?.Tenure!=='GRS_T_B'||criteria?.Currency!=='GBP'||criteria?.LocationKey!=='channelislandsguernsey'||!paging||!Number.isInteger(paging.totalItems)||paging.totalItems<=0||!Number.isInteger(paging.total)||paging.total<1||paging.total>100||paging.current!==list.currentPage)throw Error('Invalid Savills search coverage or scope');
+  const ids=page.results?.Properties;
+  if(!Array.isArray(ids)||!ids.length||new Set(ids).size!==ids.length||ids.some(id=>!state.properties?.[id]||state.properties[id].ExternalPropertyID!==id))throw Error('Incomplete Savills page');
+  const current=new URL(pageUrl);
+  const expectedPath=SAVILLS_SEARCH+(paging.current===1?'':'/page/'+paging.current);
+  if(current.origin!==SAVILLS||current.pathname!==expectedPath)throw Error('Unexpected Savills page');
+  const next=paging.current<paging.total?SAVILLS+SAVILLS_SEARCH+'/page/'+(paging.current+1):null;
+  const advertisedNext=page.metaData?.NextUrl;
+  if((advertisedNext?new URL('/'+advertisedNext.replace(/^\//,''),SAVILLS).href:null)!==next)throw Error('Invalid Savills pagination');
+  return {records:ids.map(id=>state.properties[id]),expected:paging.totalItems,pages:paging.total,next};
+}
+function parseSavillsProperty(p,now){
+  if(p.TenureType!=='GRS_T_B'||p.IsSold||p.IsLet||p.IsCommercial||p.IsConfidential)return null;
+  const sourceTypes=(p.PropertyTypes||[]).map(t=>t.Type);
+  // Building plots may advertise proposed bedrooms and carry a house tag.
+  if(sourceTypes.includes('building-plot'))return null;
+  const type=sourceTypes.includes('bungalow')?'Bungalow':sourceTypes.includes('house')?'House':sourceTypes.some(t=>['flat-apartment','penthouse','duplex'].includes(t))?'Apartment':null;
+  if(!type)return null;
+  const priceLabel=text([p.GuidePriceText,p.DisplayPriceText].filter(Boolean).join(' '));
+  if(p.ShowPrice!==true||p.DisplayCurrency!=='GBP')return null;
+  const price=askingPrice(priceLabel,p.Price);if(price===null)return null;
+  if(!Number.isSafeInteger(p.ID)||p.ID<=0||p.ID>=100000000||p.PropertyID!==p.ID||!/^GBGUES[A-Z0-9]+$/.test(p.ExternalPropertyID))throw Error('Invalid Savills identity');
+  const flag=text(p.PropertyStatusFlagTranslation||'').toLowerCase();
+  const status=flag==='under offer'&&p.PropertyStatusFlag===1?'under':((!flag&&p.PropertyStatusFlag===0)||(flag==='new'&&p.PropertyStatusFlag===10))?'available':null;
+  if(!status)throw Error('Unknown Savills status: '+flag);
+  const markets=(p.MarketTypes||[]).map(m=>m.Caption);
+  if(markets.length!==1||!['Local Market','Open Market'].includes(markets[0]))throw Error('Unknown Savills market');
+  const name=text(p.AddressLine1),location=text(p.AddressLine2),address=text([p.AddressLine1,p.AddressLine2].join(', '));
+  if(!name||!location)throw Error('Missing Savills address');
+  if(/\b(?:Alderney|Sark|Herm|Jersey)\b/i.test(location))return null;
+  const parishMap={'st martin':"St Martin's",'st sampson':"St Sampson's",'st andrew':"St Andrew's",'st saviour':"St Saviour's",'st peters':"St Peter's",'st pierre du bois':"St Peter's"};
+  const parish=location.split(',').map(s=>s.trim().replaceAll('’',"'").toLowerCase()).reverse().map(s=>parishMap[s]||['Castel','Forest','Vale','Torteval',"St Andrew's","St Martin's",'St Peter Port',"St Peter's","St Sampson's","St Saviour's"].find(n=>n.toLowerCase()===s)).find(Boolean)||null;
+  const route=p.MetaInformation?.CanonicalUrl;
+  if(route!=='property-detail/'+p.ExternalPropertyID.toLowerCase())throw Error('Unexpected Savills detail route');
+  const description=text([p.Description,...(p.LongDescription||[]).map(d=>d.Body)].join(' ')),features=(p.WebFeatureList||[]).map(text).join('. ');
+  const photos=[...new Set((p.PropertyCardImagesGallery||[]).map(i=>i.ImageUrl_L||i.ImageUrl_M||i.ImageUrl).filter(u=>{try{const v=new URL(u);return v.origin==='https://assets.savills.com'&&v.pathname.startsWith('/properties/')}catch{return false}}))];
+  // Savills Guernsey states that its displayed floor totals are approximate.
+  const displayedFloor=(p.HeaderSizeFormatted||[]).filter(s=>/sq\s*ft|sq\s*m\b/i.test(s)).map(s=>'Total floor area approximately '+s).join('. ');
+  return {id:-2000000000-p.ID,source:'savills',agent:'Savills',name,market:markets[0],price,priceLabel,beds:Number.isInteger(p.Bedrooms)&&p.Bedrooms>0?p.Bedrooms:null,type,sourceType:sourceTypes.join(', '),parish,location,address,description,url:SAVILLS+'/gg/en/'+route,photos,status,date:null,lastSeen:now,...advertisedPlot(description,features),...advertisedFloor(description,features,displayedFloor),parking:null,south:null,garden:null,refurb:null,development:null};
+}
+async function collectSavills(started){
+  const robots=await request(SAVILLS+'/robots.txt');let url=SAVILLS+SAVILLS_SEARCH,expected=null,pages=null;const records=[],visited=new Set();
+  while(url){
+    if(visited.has(url)||visited.size>=100)throw Error('Savills pagination loop');visited.add(url);
+    if(!robotsAllows(robots,new URL(url).pathname))throw Error('Savills collection disallowed by robots.txt');
+    await delay(500);
+    const page=parseSavillsIndex(await request(url),url);
+    if(expected!==null&&(expected!==page.expected||pages!==page.pages))throw Error('Savills count changed during refresh');
+    expected=page.expected;pages=page.pages;records.push(...page.records);url=page.next;
+  }
+  if(records.length!==expected||visited.size!==pages||new Set(records.map(p=>p.ID)).size!==expected||new Set(records.map(p=>p.ExternalPropertyID)).size!==expected)throw Error('Savills coverage mismatch; previous data retained');
+  const properties=records.map(p=>parseSavillsProperty(p,started)).filter(Boolean);
+  if(!properties.length)throw Error('No priced Savills residential properties; previous feed retained');
+  return {properties,coverage:{markets:['Local Market','Open Market'],discovered:expected,collected:properties.length,excluded:expected-properties.length}};
+}
 async function run(){
   const started=new Date().toISOString();
   const cb=await collectCooperBrouard(started);
   const sw=await collectSwoffers(started);
   const cg=await collectCherry(started);
-  const properties=[...cb.properties,...sw.properties,...cg.properties];
+  const sv=await collectSavills(started);
+  const properties=[...cb.properties,...sw.properties,...cg.properties,...sv.properties];
   if(properties.some(p=>!Number.isFinite(p.price)||p.price<=0)||new Set(properties.map(p=>p.id)).size!==properties.length)throw Error('Invalid combined feed; previous data retained');
-  const data={schemaVersion:1,agent:'Cooper Brouard, Swoffers and Cherry Godfrey',agents:['Cooper Brouard','Swoffers','Cherry Godfrey'],sourceUrl:ORIGIN,sourceUrls:[ORIGIN,SWOFFERS,CHERRY],generatedAt:new Date().toISOString(),startedAt:started,coverage:{markets:['Local Market','Open Market'],discovered:cb.coverage.discovered+sw.coverage.discovered+cg.coverage.discovered,collected:properties.length,excluded:cb.coverage.excluded+sw.coverage.excluded+cg.coverage.excluded,sources:{'cooper-brouard':cb.coverage,swoffers:sw.coverage,'cherry-godfrey':cg.coverage}},properties};
+  const data={schemaVersion:1,agent:'Cooper Brouard, Swoffers, Cherry Godfrey and Savills',agents:['Cooper Brouard','Swoffers','Cherry Godfrey','Savills'],sourceUrl:ORIGIN,sourceUrls:[ORIGIN,SWOFFERS,CHERRY,SAVILLS],generatedAt:new Date().toISOString(),startedAt:started,coverage:{markets:['Local Market','Open Market'],discovered:cb.coverage.discovered+sw.coverage.discovered+cg.coverage.discovered+sv.coverage.discovered,collected:properties.length,excluded:cb.coverage.excluded+sw.coverage.excluded+cg.coverage.excluded+sv.coverage.excluded,sources:{'cooper-brouard':cb.coverage,swoffers:sw.coverage,'cherry-godfrey':cg.coverage,savills:sv.coverage}},properties};
   await fs.writeFile(DATA+'.tmp',JSON.stringify(data,null,2)+'\n');await fs.rename(DATA+'.tmp',DATA);
   console.log(`Published ${properties.length} current residential listings`);return data;
 }
-module.exports={collect,parseIndex,parseProperty,robotsAllows,text,askingPrice,advertisedPlot,advertisedFloor,parseSwoffersIndex,parseSwoffersProperty,collectSwoffers,collectCooperBrouard,parseCherryProperty,parseCherryFeed,collectCherry};
+module.exports={collect,parseIndex,parseProperty,robotsAllows,text,askingPrice,advertisedPlot,advertisedFloor,parseSwoffersIndex,parseSwoffersProperty,collectSwoffers,collectCooperBrouard,parseCherryProperty,parseCherryFeed,collectCherry,parseSavillsIndex,parseSavillsProperty,collectSavills};
 if(require.main===module)collect().catch(error=>{console.error(error.message);process.exitCode=1});
 
 
