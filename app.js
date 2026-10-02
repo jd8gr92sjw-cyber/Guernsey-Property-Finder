@@ -10,7 +10,7 @@ let properties=[],currentTab='search',currentDetail=null,dataset=null,loading=tr
 let shortlist=readJSON('gp_shortlist',[]);if(!Array.isArray(shortlist))shortlist=[];
 const val=id=>$(id).value,checked=id=>$(id).checked;
 const money=p=>p.price==null?'Price on application':'£'+p.price.toLocaleString('en-GB');
-const safeUrl=url=>{try{const u=new URL(url);return u.protocol==='https:'&&(['www.cooperbrouard.com','cdn.cooperbrouard.com','swoffers.co.uk','assets.reapit.net','www.cherrygodfreyproperty.com','search.savills.com','assets.savills.com'].includes(u.hostname)||/^med\d+\.expertagent\.co\.uk$/.test(u.hostname))?u.href:''}catch{return ''}};
+const safeUrl=url=>{try{const u=new URL(url);return u.protocol==='https:'&&(['www.cooperbrouard.com','cdn.cooperbrouard.com','swoffers.co.uk','assets.reapit.net','www.cherrygodfreyproperty.com','www.livingroomproperty.com'].includes(u.hostname)||/^med\d+\.expertagent\.co\.uk$/.test(u.hostname))?u.href:''}catch{return ''}};
 function statusLabel(p){return p.unavailable?'No longer in latest feed':p.status==='under'?'Under offer':'For sale'}
 function isNew(p){return p.date&&Date.now()-Date.parse(p.date)>=0&&Date.now()-Date.parse(p.date)<=14*86400000}
 function plotLabel(p){

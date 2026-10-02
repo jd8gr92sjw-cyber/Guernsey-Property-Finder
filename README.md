@@ -7,7 +7,7 @@ hosting and GitHub Actions. The app and collector run independently of the
 original computer. The original working local app is preserved separately.
 
 ## Collection and hosting
-- Cooper Brouard, Swoffers, Cherry Godfrey and Savills residential sales, including Local and Open Market properties.
+- Cooper Brouard, Swoffers, Cherry Godfrey and Livingroom residential sales, including Local and Open Market properties.
 - Only positive numerical asking prices are collected. POA, Price on Application,
   Price on Request and missing-price listings are excluded from all agents.
 - Swoffers pagination totals and source type filters are checked before publication.
@@ -45,9 +45,11 @@ Cherry Godfrey IDs use a reserved negative range; existing IDs are unchanged.
 Original links use the website's public detail routes, and Expert Agent photos
 use HTTPS. The existing layout and collection schedule are unchanged.
 
-## Savills integration
+## Livingroom integration
 
-The public Guernsey residential sale search is collected across all advertised pages. Declared totals, unique source identities, sale scope and pagination are checked before the combined feed is replaced. Sold, rental, commercial, confidential, building-plot and unpriced/POA listings are excluded. Local and Open Market homes, including under offer, use the existing schema and filters. Savills IDs occupy a separate reserved negative range, preserving existing notes and shortlists. Photos and original links use only Savills HTTPS hosts. Published floor totals retain Savills Guernsey's approximate qualification; absent facts and listing dates remain unknown. The layout, schedule and deployment workflow are unchanged.
+The public website search feed supplies all Guernsey sales, including under offer. Its request identity, branch, unique listing IDs and published sale flags are checked. Detail headers confirm identity, advertised price and market before photographs and advertised plot/floor sizes are collected. Sold, rented, leased, private, POA/unpriced, non-parish islands and records without residential bedroom evidence are excluded. Source IDs occupy a reserved negative range without changing existing notes or shortlists. Missing type and listing-date fields remain unknown; displayed approximate floor totals retain that qualification. All four refreshed sources must succeed before publication. The layout and six-hour collection schedule are unchanged.
+
+Savills is excluded at the user’s request.
 
 ## Original deployment validation
 The first cloud workflow successfully collected 114 properties, passed the 12

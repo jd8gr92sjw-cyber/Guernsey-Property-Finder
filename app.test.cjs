@@ -1,14 +1,15 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const vm=require('node:vm');const path=require('node:path');
 const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),script=fs.readFileSync(path.join(__dirname,'app.js'),'utf8');
-test('Savills displays alongside all existing agents and uses existing filters, details and secure links',async()=>{
+
+test('Livingroom displays alongside existing agents and uses existing filters, unknown type and safe details',async()=>{
  const t=await boot(),base=t.getFeed().properties[0];
- const p={...base,id:-2001191499,source:'savills',agent:'Savills',name:'Savills fixture',market:'Open Market',price:565000,beds:2,type:'Bungalow',parish:'Vale',plot:null,area:null,date:null,url:'https://search.savills.com/gg/en/property-detail/gbguesgue250055',photos:['https://assets.savills.com/properties/photo.jpg']};
+ const p={...base,id:-2000005341,source:'livingroom',agent:'Livingroom',name:'Livingroom fixture',market:'Open Market',price:535000,beds:2,type:null,parish:'Vale',plot:null,area:699,areaQualifier:'approximate',date:null,url:'https://www.livingroomproperty.com/buy/property/5341',photos:['https://www.livingroomproperty.com/property_media/5341/photo.jpg']};
  const others=['Cooper Brouard','Swoffers','Cherry Godfrey'].map((agent,i)=>({...base,id:900000+i,name:agent+' fixture',agent,market:'Local Market',price:900000}));
- t.setFeed({...t.getFeed(),properties:[...others,p]});await t.context.loadListings();assert.equal(t.e.count.textContent,'4 matching properties');for(const agent of [...others.map(p=>p.agent),'Savills'])assert.ok(t.e.results.innerHTML.includes(agent));
- t.e.market.value='Open Market';t.e.maxPrice.value='600000';t.e.type.value='Bungalow';t.e.parish.value='Vale';t.e.beds.value='2';t.run('runSearch()');assert.equal(t.e.count.textContent,'1 matching property');assert.match(t.e.results.innerHTML,/Savills fixture/);
- t.e.minPrice.value='600000';t.run('runSearch()');assert.equal(t.e.count.textContent,'0 matching properties');
- t.run(`showDetail(${p.id})`);assert.ok(t.e.detail.innerHTML.includes(p.url));assert.ok(t.e.detail.innerHTML.includes(p.photos[0]));
- for(const url of ['http://assets.savills.com/photo.jpg','https://assets.savills.com.evil.test/photo.jpg','https://search.savills.com.evil.test/'])assert.equal(t.run(`safeUrl(${JSON.stringify(url)})`),'');
+ t.setFeed({...t.getFeed(),properties:[...others,p]});await t.context.loadListings();assert.equal(t.e.count.textContent,'4 matching properties');for(const agent of [...others.map(p=>p.agent),'Livingroom'])assert.ok(t.e.results.innerHTML.includes(agent));
+ t.e.market.value='Open Market';t.e.maxPrice.value='600000';t.e.parish.value='Vale';t.e.beds.value='2';t.run('runSearch()');assert.equal(t.e.count.textContent,'1 matching property');
+ t.e.type.value='Bungalow';t.run('runSearch()');assert.equal(t.e.count.textContent,'0 matching properties');t.e.unknown.checked=true;t.run('runSearch()');assert.equal(t.e.count.textContent,'1 matching property');
+ t.run(`showDetail(${p.id})`);assert.ok(t.e.detail.innerHTML.includes(p.url));assert.ok(t.e.detail.innerHTML.includes(p.photos[0]));assert.match(t.e.detail.innerHTML,/Approx/);
+ for(const url of ['http://www.livingroomproperty.com/photo.jpg','https://www.livingroomproperty.com.evil.test/photo.jpg'])assert.equal(t.run(`safeUrl(${JSON.stringify(url)})`),'');
 });
 test('Cherry Godfrey records load, filter and open details with secure photos and original links',async()=>{
  const t=await boot(),base=t.getFeed().properties[0];
