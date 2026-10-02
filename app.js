@@ -68,11 +68,36 @@ function card(p){
  const badge=(label,v)=>`<span class="badge ${v==null?'unknown':v?'yes':''}">${v==null?'?':v?'✓':'✕'} ${label}</span>`;
  return `<article class="card"><div class="photo">${photo?`<img src="${esc(photo)}" alt="${esc(p.name)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentElement.textContent='Photo unavailable'">`:'No photograph supplied'}</div><div class="body"><div class="top"><div class="price">${money(p)}</div><div class="tag">${esc(p.agent)}</div></div><div class="name">${esc(p.name)}</div><div class="meta">${esc(p.type||'Type unknown')} · ${esc(p.location)} · ${esc(p.market)}</div><p class="source-note">${statusLabel(p)}${isNew(p)?' · Listed within 14 days':''}</p><div class="facts">${p.beds??'Unknown'} beds · ${esc(plotLabel(p))} · ${esc(floorLabel(p))}</div>${sizeNotice(p)}<div class="badges">${badge('3+ parking',p.parking==null?null:p.parking>=3)}${badge('South/sunny',p.south)}${badge('Outside space',p.garden)}${badge('Refurb potential',p.refurb)}</div><div class="footer"><span class="match">${sc==null?'No feature preferences':sc+'% confirmed feature match'}</span><div class="actions2"><button class="icon" aria-label="${saved?'Remove from':'Add to'} shortlist: ${esc(p.name)}" aria-pressed="${saved}" onclick="toggleShort(${p.id})">${saved?'⭐':'☆'}</button><button class="icon" onclick="showDetail(${p.id})">Details</button></div></div></div></article>`;
 }
-function allProperties(){const saved=readJSON('gp_property_snapshots',{});const snapshots=saved&&typeof saved==='object'&&!Array.isArray(saved)?Object.values(saved):[];return [...properties,...snapshots.filter(p=>p&&Number.isInteger(p.id)&&shortlist.includes(p.id)&&!properties.some(q=>q.id===p.id)).map(p=>({...p,unavailable:true}))]}
+function allProperties(){const saved=readJSON('gp_property_snapshots',{});const snapshots=saved&&typeof saved==='object'&&!Array.isArray(saved)?Object.values(saved):[];const cherry=new Map(preferredCherryListings().filter(p=>p.source==='cherry-godfrey').map(p=>[p.id,p]));return [...properties.map(p=>cherry.get(p.id)||p),...snapshots.filter(p=>p&&Number.isInteger(p.id)&&shortlist.includes(p.id)&&!properties.some(q=>q.id===p.id)).map(p=>({...p,unavailable:true}))]}
+function preferredCherryListings(){
+ const normal=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
+ const house=p=>normal(String(p.name||'').split(',')[0]).replace(/^no(?=\d)/,'');
+ const parish=p=>{const s=normal(p.parish);return ({stpierredubois:'stpeter'})[s]||s.replace(/^(saint|st)/,'st').replace(/^(st(?:martin|andrew|saviour|sampson|peter))s$/,'$1')};
+ const key=p=>{const name=house(p);return name&&p.parish&&p.market&&Number.isInteger(p.beds)&&p.beds>0&&!/^(?:(?:flat|apartment|apt)?\d+[a-z]?|house|cottage|bungalow|apartment|flat|thehouse|thecottage|thebungalow)$/.test(name)&&!/confidential|investment|development|opportunity/.test(name)?[name,parish(p),normal(p.market),p.beds].join('|'):null};
+ const streets=p=>String(p.address||'').split(',').map(part=>part.trim()).filter(part=>{const n=normal(part);return n&&n!==house(p)&&n!==normal(p.name)&&parish({parish:part})!==parish(p)&&!/^guernsey$|^channelislands$|^gy\d/.test(n)}).map(part=>({name:normal(part.replace(/^\s*\d+[a-z]?\s+/i,'')).replace(/close$/,'clos'),number:part.match(/^\s*(\d+[a-z]?)\b/i)?.[1]?.toLowerCase()}));
+ const compatible=(a,b)=>{const ar=streets(a),br=streets(b);return ar.length&&br.length?ar.some(x=>br.some(y=>x.name===y.name&&(!x.number||!y.number||x.number===y.number))):a.price===b.price};
+ const groups=new Map(),claimed=new Set(),preferred=[];
+ for(const p of properties){const k=key(p);if(k){if(!groups.has(k))groups.set(k,[]);groups.get(k).push(p)}}
+ for(const group of groups.values()){
+  const cherries=group.filter(p=>p.source==='cherry-godfrey');
+  // Repeated records from one agent make the identity ambiguous.
+  if(cherries.length!==1||new Set(group.map(p=>p.source)).size!==group.length)continue;
+  const cherry=cherries[0],duplicates=[cherry,...group.filter(p=>p!==cherry&&compatible(cherry,p))];if(duplicates.length<2)continue;
+  const view={...cherry,cherryPreferred:true,duplicateListings:duplicates},priority={upper:0,approximate:1,exact:2,lower:3};
+  const plots=duplicates.filter(p=>Number.isFinite(p.plot)&&p.plot>0).sort((a,b)=>a.plot-b.plot||(priority[a.plotQualifier]??2)-(priority[b.plotQualifier]??2));
+  if(plots.length){const smallest=plots[0];for(const field of ['plot','plotQualifier','plotModifier'])view[field]=smallest[field];view.plotConflict=plots.some(p=>p.plot!==smallest.plot)||plots.some(p=>p.plotConflict);view.plotEvidence=plots.flatMap(p=>(p.plotEvidence?.length?p.plotEvidence:[{wording:plotLabel(p)}]).map(e=>({...e,wording:p.agent+': '+e.wording})));}
+  if(!(Number.isFinite(view.area)&&view.area>0)){
+   const areas=duplicates.filter(p=>Number.isFinite(p.area)&&p.area>0).sort((a,b)=>a.area-b.area||(priority[a.areaQualifier]??2)-(priority[b.areaQualifier]??2));
+   if(areas.length){for(const field of ['area','areaQualifier','areaModifier'])view[field]=areas[0][field];view.areaConflict=areas.some(p=>p.area!==areas[0].area)||areas.some(p=>p.areaConflict);view.areaEvidence=areas.flatMap(p=>(p.areaEvidence?.length?p.areaEvidence:[{wording:floorLabel(p)}]).map(e=>({...e,wording:p.agent+': '+e.wording})));}
+  }
+  preferred.push(view);duplicates.forEach(p=>claimed.add(p.id));
+ }
+ return [...properties.filter(p=>!claimed.has(p.id)),...preferred];
+}
 function searchProperties(){
  const normal=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
  const groups=new Map();
- for(const p of properties){
+ for(const p of preferredCherryListings()){
   const road=normal(String(p.address||'').split(',').filter(part=>normal(part)!==normal(p.parish)).join(','));
   // Require a specific name and matching street, parish and market. Ambiguous listings stay separate.
   const key=road&&p.parish&&p.market&&p.name&&!/confidential|investment opportunity/i.test(p.name)?[normal(p.name),road,normal(p.parish),normal(p.market)].join('|'):'id:'+p.id;
@@ -85,7 +110,7 @@ function searchProperties(){
   return [{...sorted[0],duplicateListings:group}];
  });
 }
-function duplicateEvidenceHtml(p){return p.duplicateListings?`<h3>Also advertised by</h3><p class="source-note">One search result is shown using the smaller advertised plot figure. Both original listings remain available.</p><ul>${p.duplicateListings.map(q=>`<li><a href="${esc(safeUrl(q.url))}" target="_blank" rel="noopener noreferrer">${esc(q.agent)}</a>: ${esc(plotLabel(q))}</li>`).join('')}</ul>`:''}
+function duplicateEvidenceHtml(p){return p.duplicateListings?`<h3>Also advertised by</h3><p class="source-note">${p.cherryPreferred?'Cherry Godfrey is shown as the main listing. Where agents state plot sizes, the smaller figure is used. All original listings remain available.':'One search result is shown using the smaller advertised plot figure. Both original listings remain available.'}</p><ul>${p.duplicateListings.map(q=>`<li><a href="${esc(safeUrl(q.url))}" target="_blank" rel="noopener noreferrer">${esc(q.agent)}</a>: ${p.cherryPreferred?esc(money(q))+' · ':''}${esc(plotLabel(q))}</li>`).join('')}</ul>`:''}
 function runSearch(){
  const r=currentTab==='shortlist'?allProperties().filter(p=>shortlist.includes(p.id)):searchProperties().filter(matches);
  const newest=(a,b)=>(b.date||'').localeCompare(a.date||'')||(a.price??Infinity)-(b.price??Infinity);
