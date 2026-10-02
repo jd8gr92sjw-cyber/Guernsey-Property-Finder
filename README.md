@@ -7,11 +7,11 @@ hosting and GitHub Actions. The app and collector run independently of the
 original computer. The original working local app is preserved separately.
 
 ## Collection and hosting
-- Cooper Brouard, Swoffers, Cherry Godfrey and Livingroom residential sales, including Local and Open Market properties.
+- Cooper Brouard, Swoffers, Cherry Godfrey, Livingroom and Cranfords residential sales, including Local and Open Market properties.
 - Only positive numerical asking prices are collected. POA, Price on Application,
   Price on Request and missing-price listings are excluded from all agents.
 - Swoffers pagination totals and source type filters are checked before publication.
-  All four agents must finish successfully before the combined feed replaces the previous one.
+  All five agents must finish successfully before the combined feed replaces the previous one.
 - Scheduled collection at 02:23, 08:23, 14:23 and 20:23 UTC every day.
   GitHub may delay scheduled jobs; the app shows the actual collection time.
 - Pushes to main and manual workflow runs also collect, test and deploy.
@@ -47,7 +47,7 @@ use HTTPS. The existing layout and collection schedule are unchanged.
 
 ## Livingroom integration
 
-The public website search feed supplies all Guernsey sales, including under offer. Its request identity, branch, unique listing IDs and published sale flags are checked. Detail headers confirm identity, advertised price and market before photographs and advertised plot/floor sizes are collected. Sold, rented, leased, private, POA/unpriced, non-parish islands and records without residential bedroom evidence are excluded. Source IDs occupy a reserved negative range without changing existing notes or shortlists. Missing type and listing-date fields remain unknown; displayed approximate floor totals retain that qualification. All four refreshed sources must succeed before publication. The layout and six-hour collection schedule are unchanged.
+The public website search feed supplies all Guernsey sales, including under offer. Its request identity, branch, unique listing IDs and published sale flags are checked. Detail headers confirm identity, advertised price and market before photographs and advertised plot/floor sizes are collected. Sold, rented, leased, private, POA/unpriced, non-parish islands and records without residential bedroom evidence are excluded. Source IDs occupy a reserved negative range without changing existing notes or shortlists. Missing type and listing-date fields remain unknown; displayed approximate floor totals retain that qualification. All five refreshed sources must succeed before publication. The layout and six-hour collection schedule are unchanged.
 
 Savills is excluded at the user’s request.
 
@@ -125,3 +125,7 @@ shortlist, saved-search, property-detail and note functionality is preserved.
 References:
 - https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages
 - https://support.apple.com/guide/iphone/iph42ab2f3a7/ios
+
+## Cranfords integration
+
+The public JSON feed is cross-checked against all property links on the public listing page. Eligible detail pages confirm source ID, URL, advertised price, market, parish and bedrooms before publication. Rentals, sold, commercial, land/plots, and POA/unpriced records are excluded; under-offer homes remain included. Explicit property types and positive parking counts use the existing filters. CRM creation dates are not treated as advertised listing dates. Qualified plot and floor measurements use the shared extraction rules. Cranfords source IDs have their own negative range. Existing layout, storage, refresh schedule and deployment are preserved.

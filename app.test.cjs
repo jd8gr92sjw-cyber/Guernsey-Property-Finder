@@ -1,5 +1,13 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const vm=require('node:vm');const path=require('node:path');
 const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),script=fs.readFileSync(path.join(__dirname,'app.js'),'utf8');
+test('Cranfords uses the existing combined filters and displays safe photos and original links',async()=>{
+ const t=await boot(),base=t.getFeed().properties.find(p=>p.source==='cranfords');assert.ok(base);
+ const p={...base,id:-4000000312,name:'Cranfords fixture',type:'Bungalow',parish:'Vale',market:'Local Market',price:695000,beds:3,parking:4,plot:null,area:null};
+ const other={...p,id:990001,agent:'Livingroom',source:'livingroom',name:'Other home',type:'House',parking:1};t.setFeed({...t.getFeed(),properties:[p,other]});await t.context.loadListings();assert.equal(t.e.count.textContent,'2 matching properties');
+ t.e.market.value='Local Market';t.e.maxPrice.value='700000';t.e.beds.value='3';t.e.type.value='Bungalow';t.e.parish.value='Vale';t.e.parking.checked=true;t.run('runSearch()');assert.equal(t.e.count.textContent,'1 matching property');
+ t.e.maxPrice.value='600000';t.run('runSearch()');assert.equal(t.e.count.textContent,'0 matching properties');t.e.maxPrice.value='700000';t.run(`showDetail(${p.id})`);assert.ok(t.e.detail.innerHTML.includes(p.url));assert.ok(t.e.detail.innerHTML.includes(p.photos[0]));assert.match(t.e.detail.innerHTML,/Parking spaces: 4/);
+ for(const url of ['http://www.cranfords.co.uk/photo.jpg','https://www.cranfords.co.uk.evil.test/photo.jpg'])assert.equal(t.run(`safeUrl(${JSON.stringify(url)})`),'');
+});
 
 test('Livingroom displays alongside existing agents and uses existing filters, unknown type and safe details',async()=>{
  const t=await boot(),base=t.getFeed().properties[0];

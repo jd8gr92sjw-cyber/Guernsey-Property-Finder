@@ -180,3 +180,20 @@ test('both property parsers collect plot evidence from their listing description
  const featureOnly=parseSwoffersProperty(swoffersDetail()+'<meta property="og:description" content="Gardens of approx 1 acre">',sc(),'now');
  assert.equal(featureOnly.plot,1);assert.equal(featureOnly.plotQualifier,'approximate');
 });
+
+const {parseCranfordsFeed,parseCranfordsProperty}=require('./collector.cjs');
+const cranfords={id:'312',title:'Newhaven',propertyUrl:'property/newhaven',propertyPriceFormatted:'695,000',propertyPrice:695000,parish:'St Sampson',market:'Local Market',bedrooms:3,parking:4,propertyType:'bungalow',propertyTags:['Under Offer With Cranfords'],buyRent:'buy'};
+function cranfordsHtml({price='£695,000',market='Local Market',id='312',tags='Under Offer With Cranfords'}={}){return `<link rel="canonical" href="https://www.cranfords.co.uk/property/newhaven"/><script type="application/json" data-drupal-selector="drupal-settings-json">${JSON.stringify({path:{currentPath:'node/'+id}})}</script><article class="node--type-property"><div class="property-lead-info"><h1>Newhaven</h1><div class="parish">St Sampson</div><div class="market">${market}</div><div class="price">${price}</div><div>${tags}</div><div class="bedrooms text-semi-bold"><span>3</span></div></div><div class="lead-property-images"><img src="/sites/default/files/styles/lead_image/public/property-images/photo.jpg" class="image-style-lead-image"/></div><div class="text-large generic-content field--name-body">A bungalow with a plot of approximately 0.5 acres. Total floor area approximately 1600 sq ft.</div><div class="key-facts-content generic-content">Detached Bungalow</div></article>`;}
+test('Cranfords maps advertised price, bedrooms, parking, parish, type, photos and qualified sizes',()=>{
+ const p=parseCranfordsProperty(cranfordsHtml(),cranfords,'now');assert.equal(p.id,-4000000312);assert.equal(p.price,695000);assert.equal(p.beds,3);assert.equal(p.parking,4);assert.equal(p.parish,"St Sampson's");assert.equal(p.type,'Bungalow');assert.equal(p.status,'under');assert.equal(p.date,null);assert.equal(p.plot,.5);assert.equal(p.area,1600);assert.equal(p.areaQualifier,'approximate');assert.equal(p.photos.length,1);
+});
+test('Cranfords excludes POA, rentals, sold, commercial and proposed-bedroom plots; checks detail identity and changed facts',()=>{
+ for(const changed of [{buyRent:'rent'},{propertyTags:['Sold by Cranfords']},{propertyTags:['Commercial Property']},{title:'Building Plot',bedrooms:3},{propertyPriceFormatted:'POA'},{propertyPriceFormatted:'Price on Request'},{market:'Sark'},{bedrooms:0}])assert.equal(parseCranfordsProperty(cranfordsHtml(),{...cranfords,...changed},'now'),null);
+ assert.equal(parseCranfordsProperty(cranfordsHtml({price:'POA'}),cranfords,'now'),null);assert.equal(parseCranfordsProperty(cranfordsHtml({tags:'Sold by Cranfords'}),cranfords,'now'),null);
+ for(const changed of [{id:'313'},{price:'£700,000'},{market:'Open Market'}])assert.throws(()=>parseCranfordsProperty(cranfordsHtml(changed),cranfords,'now'),/mismatch|changed/);
+});
+test('Cranfords feed must agree with every indexed property and have unique source IDs',()=>{
+ const html='<a href="/property/newhaven">Home</a>';assert.equal(parseCranfordsFeed([cranfords],html).length,1);
+ for(const feed of [[],[cranfords,cranfords],[{...cranfords,propertyUrl:'property/elsewhere'}],[{...cranfords,buyRent:'unknown'}]])assert.throws(()=>parseCranfordsFeed(feed,html),/Incomplete|Unexpected/);
+ assert.throws(()=>parseCranfordsFeed([cranfords],html+'<a href="/property/missing">Missing</a>'),/Incomplete/);
+});

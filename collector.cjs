@@ -4,6 +4,7 @@ const {setTimeout: delay} = require('node:timers/promises');
 const ORIGIN = 'https://www.cooperbrouard.com';
 const SWOFFERS = 'https://swoffers.co.uk';
 const CHERRY = 'https://www.cherrygodfreyproperty.com';
+const CRANFORDS = 'https://www.cranfords.co.uk';
 const LIVINGROOM = 'https://www.livingroomproperty.com';
 const DATA = path.join(__dirname, 'properties.json');
 const UA = 'GuernseyPropertyFinder/1.0 (private property search; low-frequency collector)';
@@ -86,7 +87,7 @@ function advertisedFloor(...sources){
  return {area:chosen.value,areaQualifier:chosen.qualifier,areaModifier:chosen.modifier,areaConflict:evidence.some(e=>Math.abs(e.value-smallest)>Math.max(1,smallest*.01)),areaEvidence:evidence};
 }
 async function request(url,options={}) {
-  if(![ORIGIN,SWOFFERS,CHERRY,LIVINGROOM].includes(new URL(url).origin))throw Error('Unexpected collection origin');
+  if(![ORIGIN,SWOFFERS,CHERRY,LIVINGROOM,CRANFORDS].includes(new URL(url).origin))throw Error('Unexpected collection origin');
   for(let attempt=0;attempt<3;attempt++){
     try{
       const r=await fetch(url,{...options,headers:{'User-Agent':UA,...options.headers},signal:AbortSignal.timeout(30000)});
@@ -348,19 +349,57 @@ async function collectLivingroom(started){
   if(!properties.length)throw Error('No priced Livingroom residential properties; previous feed retained');
   return {properties,coverage:{markets:['Local Market','Open Market'],discovered:records.length,collected:properties.length,excluded}};
 }
+function parseCranfordsFeed(feed,indexHtml){
+  const paths=[...new Set([...indexHtml.matchAll(/href="(\/property\/[a-z0-9-]+)"/g)].map(m=>m[1]))];
+  if(!Array.isArray(feed)||!feed.length||new Set(feed.map(p=>p.id)).size!==feed.length||new Set(feed.map(p=>p.propertyUrl)).size!==feed.length||paths.length!==feed.length)throw Error('Incomplete Cranfords feed');
+  if(feed.some(p=>!/^\d+$/.test(p.id)||Number(p.id)<=0||Number(p.id)>=100000000||!/^property\/[a-z0-9-]+$/.test(p.propertyUrl)||!paths.includes('/'+p.propertyUrl)||!['buy','rent'].includes(p.buyRent)||!Array.isArray(p.propertyTags)))throw Error('Unexpected Cranfords identity or scope');
+  return feed;
+}
+function cranfordsEligible(p){return p.buyRent==='buy'&&['Local Market','Open Market'].includes(p.market)&&p.bedrooms>0&&!/\bsold\b|\bleased\b|\brental\b|\bcommercial\b|\bplot\b/i.test(p.title+' '+p.propertyTags.join(' '))&&askingPrice('£'+p.propertyPriceFormatted,p.propertyPrice)!==null}
+function parseCranfordsProperty(html,p,now){
+  if(!cranfordsEligible(p))return null;
+  const settings=JSON.parse(html.match(/<script type="application\/json" data-drupal-selector="drupal-settings-json">([\s\S]*?)<\/script>/)?.[1]||'null');
+  if(settings?.path?.currentPath!=='node/'+p.id||!html.includes('node--type-property'))throw Error('Cranfords detail identity mismatch');
+  const canonical=html.match(/rel="canonical" href="([^"]+)"/)?.[1];if(canonical!==CRANFORDS+'/'+p.propertyUrl)throw Error('Cranfords detail URL mismatch');
+  const lead=html.match(/<div class="property-lead-info">([\s\S]*?)<div class="lead-property-images">/)?.[1];if(!lead)throw Error('Missing Cranfords detail header');
+  const field=c=>text(lead.match(new RegExp('<div class="'+c+'">([\\s\\S]*?)<\\/div>'))?.[1]);
+  const priceLabel=field('price'),price=askingPrice(priceLabel);if(price===null||/\bsold\b|\bleased\b|\brental\b|\bcommercial\b/i.test(text(lead)))return null;
+  if(price!==askingPrice('£'+p.propertyPriceFormatted,p.propertyPrice)||field('market')!==p.market||field('parish')!==p.parish)throw Error('Cranfords advertised facts changed during collection');
+  const name=text(lead.match(/<h1>([\s\S]*?)<\/h1>/)?.[1]);if(name!==text(p.title))throw Error('Cranfords title mismatch');
+  const beds=Number(text(lead.match(/class="bedrooms text-semi-bold"><span>([\s\S]*?)<\/span>/)?.[1]));if(beds!==p.bedrooms)throw Error('Cranfords bedroom mismatch');
+  const parishMap={'St Peter Port':'St Peter Port','St Sampson':"St Sampson's",'St Martin':"St Martin's",'St Andrew':"St Andrew's",'St Saviour':"St Saviour's",'St Pierre du Bois':"St Peter's",'St Peter':"St Peter's",Castel:'Castel',Forest:'Forest',Vale:'Vale',Torteval:'Torteval'},parish=parishMap[p.parish];if(!parish)throw Error('Unknown Cranfords parish');
+  const types={detached:'House',semi_detached:'House',terraced_house:'House',house:'House',cottage:'Cottage',apartment:'Apartment',bungalow:'Bungalow',chalet_bungalow:'Chalet bungalow'},type=p.propertyType?types[p.propertyType]:null;if(p.propertyType&&!type)throw Error('Unknown Cranfords residential type');
+  const description=text(html.match(/class="text-large generic-content field--name-body">([\s\S]*?)<\/div>/)?.[1]),features=text(html.match(/class="key-facts-content generic-content">([\s\S]*?)<\/div>/)?.[1]);if(!description)throw Error('Missing Cranfords description');
+  const photos=[...new Set([...html.matchAll(/<img\b[^>]*src="([^"]+)"[^>]*class="image-style-lead-image"/g)].map(m=>new URL(m[1].replaceAll('&amp;','&'),CRANFORDS)).filter(u=>u.origin===CRANFORDS&&u.pathname.startsWith('/sites/default/files/styles/lead_image/public/property-images/')).map(u=>u.href))];
+  if(!photos.length)throw Error('Missing Cranfords property photographs');
+  const status=/under offer/i.test(text(lead))?'under':'available';
+  // CRM creation time is not an advertised listing date.
+  return {id:-4000000000-Number(p.id),source:'cranfords',agent:'Cranfords',name,market:p.market,price,priceLabel,beds,type,sourceType:p.propertyType,parish,location:parish,address:name+', '+parish,description,url:canonical,photos,status,date:null,lastSeen:now,...advertisedPlot(description,features),...advertisedFloor(description,features),parking:Number.isInteger(p.parking)&&p.parking>0?p.parking:null,south:null,garden:null,refurb:null,development:null};
+}
+async function collectCranfords(started){
+  const robots=await request(CRANFORDS+'/robots.txt');
+  async function permitted(url){if(!robotsAllows(robots,new URL(url).pathname))throw Error('Cranfords collection disallowed by robots.txt');await delay(500);return request(url)}
+  const records=parseCranfordsFeed(JSON.parse(await permitted(CRANFORDS+'/sites/default/files/property-listings/properties-listing-feed.json')),await permitted(CRANFORDS+'/property-listings'));
+  const properties=[];let excluded=0;
+  for(const p of records){if(!cranfordsEligible(p)){excluded++;continue}const property=parseCranfordsProperty(await permitted(CRANFORDS+'/'+p.propertyUrl),p,started);if(property)properties.push(property);else excluded++;if((properties.length+excluded)%20===0)console.log(`Cranfords: collected ${properties.length}; excluded ${excluded} of ${records.length}`)}
+  if(!properties.length)throw Error('No priced Cranfords residential properties; previous feed retained');
+  return {properties,coverage:{markets:['Local Market','Open Market'],discovered:records.length,collected:properties.length,excluded}};
+}
+
 async function run(){
   const started=new Date().toISOString();
   const cb=await collectCooperBrouard(started);
   const sw=await collectSwoffers(started);
   const cg=await collectCherry(started);
   const lr=await collectLivingroom(started);
-  const properties=[...cb.properties,...sw.properties,...cg.properties,...lr.properties];
+  const cf=await collectCranfords(started);
+  const properties=[...cb.properties,...sw.properties,...cg.properties,...lr.properties,...cf.properties];
   if(properties.some(p=>!Number.isFinite(p.price)||p.price<=0)||new Set(properties.map(p=>p.id)).size!==properties.length)throw Error('Invalid combined feed; previous data retained');
-  const data={schemaVersion:1,agent:'Cooper Brouard, Swoffers, Cherry Godfrey, and Livingroom',agents:['Cooper Brouard','Swoffers','Cherry Godfrey','Livingroom'],sourceUrl:ORIGIN,sourceUrls:[ORIGIN,SWOFFERS,CHERRY,LIVINGROOM],generatedAt:new Date().toISOString(),startedAt:started,coverage:{markets:['Local Market','Open Market'],discovered:cb.coverage.discovered+sw.coverage.discovered+cg.coverage.discovered+lr.coverage.discovered,collected:properties.length,excluded:cb.coverage.excluded+sw.coverage.excluded+cg.coverage.excluded+lr.coverage.excluded,sources:{'cooper-brouard':cb.coverage,swoffers:sw.coverage,'cherry-godfrey':cg.coverage,livingroom:lr.coverage}},properties};
+  const data={schemaVersion:1,agent:'Cooper Brouard, Swoffers, Cherry Godfrey, Livingroom and Cranfords',agents:['Cooper Brouard','Swoffers','Cherry Godfrey','Livingroom','Cranfords'],sourceUrl:ORIGIN,sourceUrls:[ORIGIN,SWOFFERS,CHERRY,LIVINGROOM,CRANFORDS],generatedAt:new Date().toISOString(),startedAt:started,coverage:{markets:['Local Market','Open Market'],discovered:cb.coverage.discovered+sw.coverage.discovered+cg.coverage.discovered+lr.coverage.discovered+cf.coverage.discovered,collected:properties.length,excluded:cb.coverage.excluded+sw.coverage.excluded+cg.coverage.excluded+lr.coverage.excluded+cf.coverage.excluded,sources:{'cooper-brouard':cb.coverage,swoffers:sw.coverage,'cherry-godfrey':cg.coverage,livingroom:lr.coverage,cranfords:cf.coverage}},properties};
   await fs.writeFile(DATA+'.tmp',JSON.stringify(data,null,2)+'\n');await fs.rename(DATA+'.tmp',DATA);
   console.log(`Published ${properties.length} current residential listings`);return data;
 }
-module.exports={collect,parseIndex,parseProperty,robotsAllows,text,askingPrice,advertisedPlot,advertisedFloor,parseSwoffersIndex,parseSwoffersProperty,collectSwoffers,collectCooperBrouard,parseCherryProperty,parseCherryFeed,collectCherry,parseLivingroomFeed,parseLivingroomProperty,collectLivingroom};
+module.exports={collect,parseIndex,parseProperty,robotsAllows,text,askingPrice,advertisedPlot,advertisedFloor,parseSwoffersIndex,parseSwoffersProperty,collectSwoffers,collectCooperBrouard,parseCherryProperty,parseCherryFeed,collectCherry,parseLivingroomFeed,parseLivingroomProperty,collectLivingroom,parseCranfordsFeed,parseCranfordsProperty,collectCranfords};
 if(require.main===module)collect().catch(error=>{console.error(error.message);process.exitCode=1});
 
 
